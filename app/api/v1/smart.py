@@ -13,6 +13,19 @@ from app.utils.logger import get_logger
 router = APIRouter()
 logger = get_logger(__name__)
 
+MODEL_NAME = "deepseek-chat"
+
+def _deepseek_headers() -> dict:
+    if not settings.deepseek_api_key:
+        raise HTTPException(status_code=500, detail="未配置 DEEPSEEK_API_KEY")
+    return {
+        "Authorization": f"Bearer {settings.deepseek_api_key}",
+        "Content-Type": "application/json",
+    }
+
+def _deepseek_url(path: str) -> str:
+    return f"{settings.deepseek_base_url.rstrip('/')}{path}"
+
 @router.post("/")
 async def parse_smart_text(request: SmartParseRequest):
     """
@@ -36,11 +49,8 @@ async def parse_smart_text(request: SmartParseRequest):
 "{request.text}"
 """
     
-    if not settings.deepseek_api_key:
-        raise HTTPException(status_code=500, detail="DeepSeek API Key 未配置")
-
     payload = {
-        "model": settings.deepseek_model,
+        "model": MODEL_NAME,
         "messages": [
             {"role": "system", "content": "你是一个严格输出JSON格式数据的医疗数据提取助手。"},
             {"role": "user", "content": prompt}
@@ -48,15 +58,11 @@ async def parse_smart_text(request: SmartParseRequest):
         "response_format": {"type": "json_object"},
         "temperature": 0.1
     }
-    
-    headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
-        "Content-Type": "application/json"
-    }
+    headers = _deepseek_headers()
     
     try:
-        async with httpx.AsyncClient(timeout=settings.deepseek_timeout_seconds) as client:
-            response = await client.post(settings.deepseek_base_url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(_deepseek_url("/chat/completions"), json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
             
@@ -146,25 +152,18 @@ async def generate_health_advice(request: HealthAdviceRequest, db: Session = Dep
 """
 
     payload = {
-        "model": settings.deepseek_model,
+        "model": MODEL_NAME,
         "messages": [
             {"role": "system", "content": "你是一位专业的健康顾问医生。"},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.5
     }
-    
-    headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
-        "Content-Type": "application/json"
-    }
+    headers = _deepseek_headers()
     
     try:
-        if not settings.deepseek_api_key:
-            raise HTTPException(status_code=500, detail="DeepSeek API Key 未配置")
-
-        async with httpx.AsyncClient(timeout=settings.deepseek_timeout_seconds) as client:
-            response = await client.post(settings.deepseek_base_url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(_deepseek_url("/chat/completions"), json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
             

@@ -53,29 +53,29 @@ def get_metric_history(
         raise HTTPException(status_code=404, detail=f"Metric {metric_id} history for person {person_id} not found")
     return history
 
-@router.put("/{metric_id}", response_model=MetricRecordResponse)
+@router.put("/{record_id}", response_model=MetricRecordResponse)
 def update_metric(
-    metric_id: int,
-    metric_in: MetricRecordUpdate,
+    record_id: int,
+    record_in: MetricRecordUpdate,
     db: Session = Depends(get_db)
 ):
     """
     更新单条体检指标
     """
-    metric = crud_metric.update_metric(db, metric_id=metric_id, metric_in=metric_in)
-    if not metric:
+    record = crud_metric.update_metric(db, record_id=record_id, record_in=record_in)
+    if not record:
         raise HTTPException(status_code=404, detail="Metric record not found")
-    return metric
+    return record
 
-@router.delete("/{metric_id}")
+@router.delete("/{record_id}")
 def delete_metric(
-    metric_id: int,
+    record_id: int,
     db: Session = Depends(get_db)
 ):
     """
     删除单条体检指标
     """
-    success = crud_metric.delete_metric(db, metric_id=metric_id)
+    success = crud_metric.delete_metric(db, record_id=record_id)
     if not success:
         raise HTTPException(status_code=404, detail="Metric record not found")
     return {"message": "Successfully deleted"}
