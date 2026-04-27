@@ -1,0 +1,14 @@
+services:
+  health:
+    build:
+      context: .
+    image: zhou7419/health:latest
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "sqlite:///./database/app.db"
+      DEEPSEEK_BASE_URL: "https://api.deepseek.com"
+      DEEPSEEK_API_KEY: ""
+    volumes:
+      - ./database:/app/database
+    restart: unless-stopped
