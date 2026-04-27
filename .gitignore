@@ -1,0 +1,10 @@
+.env
+database/app.db
+server.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.log
+.trae/

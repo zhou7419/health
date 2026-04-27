@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>体检指标管理台账</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.3.12/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.3.12/dist/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.1.0/dist/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Marked for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif; background-color: #f0f2f5; }
+        #app { height: 100%; }
+        .el-header { background-color: #409EFF; color: white; line-height: 60px; font-size: 20px; font-weight: bold; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; align-items: center; }
+        .el-header .logo { margin-right: 10px; font-size: 24px; }
+        .el-aside { background-color: #fff; box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05); z-index: 10; }
+        .el-menu-vertical { border-right: none; height: 100%; }
+        .el-main { padding: 20px; }
+        .page-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); min-height: calc(100vh - 140px); }
+        .toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .chart-container { width: 100%; height: 500px; margin-top: 20px; }
+        .abnormal-value { color: #F56C6C; font-weight: bold; }
+        .normal-value { color: #67C23A; font-weight: bold; }
+        .advice-content h1, .advice-content h2, .advice-content h3 { color: #2c3e50; }
+        .advice-content ul { padding-left: 20px; }
+        .advice-content li { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container style="height: 100vh;">
+            <el-header>
+                <el-icon class="logo"><component :is="icons.DataBoard"></component></el-icon>
+                个人体检指标管理台账
+            </el-header>
+            
+            <el-container>
+                <el-aside width="220px">
+                    <el-menu :default-active="activeMenu" class="el-menu-vertical" @select="handleSelect">
+                        <el-menu-item index="ledger">
+                            <el-icon><component :is="icons.Document"></component></el-icon>
+                            <span>数据台账</span>
+                        </el-menu-item>
+                        <el-menu-item index="input">
+                            <el-icon><component :is="icons.Edit"></component></el-icon>
+                            <span>批量录入</span>
+                        </el-menu-item>
+                        <el-menu-item index="persons">
+                            <el-icon><component :is="icons.User"></component></el-icon>
+                            <span>人员管理</span>
+                        </el-menu-item>
+                        <el-menu-item index="definitions">
+                            <el-icon><component :is="icons.Setting"></component></el-icon>
+                            <span>指标管理</span>
+                        </el-menu-item>
+                        <el-menu-item index="analysis">
+                            <el-icon><component :is="icons.TrendCharts"></component></el-icon>
+                            <span>趋势分析</span>
+                        </el-menu-item>
+                        <el-menu-item index="advice">
+                            <el-icon><component :is="icons.FirstAidKit"></component></el-icon>
+                            <span>健康建议</span>
+                        </el-menu-item>
+                    </el-menu>
+                </el-aside>
+                
+                <el-main>
+                    
+                    <!-- 视图 1：数据台账 -->
+                    <div v-show="activeMenu === 'ledger'" class="page-container">
+                        <div class="toolbar">
+                            <div class="filters">
+                                <el-select v-model="filterPersonId" placeholder="筛选人员" clearable @change="fetchRecords" style="width: 150px; margin-right: 10px;">
+                                    <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
+                                </el-select>
+                                <el-date-picker v-model="filterDate" type="date" placeholder="选择体检日期" value-format="YYYY-MM-DD" style="margin-right: 10px;" clearable @change="fetchRecords"></el-date-picker>
+                                <el-select v-model="filterMetricId" placeholder="筛选指标" clearable @change="fetchRecords" style="width: 180px; margin-right: 10px;">
+                                    <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
+                                </el-select>
+                            </div>
+                            <el-button type="primary" @click="activeMenu = 'input'">
+                                <el-icon style="margin-right: 5px;"><component :is="icons.Plus"></component></el-icon> 新增记录
+                            </el-button>
+                        </div>
+
+                        <el-table :data="records" border style="width: 100%" v-loading="loading">
+                            <el-table-column prop="record_date" label="体检日期" width="120" sortable></el-table-column>
+                            <el-table-column label="人员" width="100">
+                                <template #default="scope">{{ scope.row.person.name }}</template>
+                            </el-table-column>
+                            <el-table-column label="指标名称" width="150">
+                                <template #default="scope">{{ scope.row.metric.name }}</template>
+                            </el-table-column>
+                            <el-table-column label="数值" width="150">
+                                <template #default="scope">
+                                    <span :class="getValueClass(scope.row.value, scope.row.metric)">
+                                        {{ scope.row.value }}
+                                    </span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="期望区间" width="150">
+                                <template #default="scope">
+                                    {{ formatExpectedRange(scope.row.metric) }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="单位" width="100">
+                                <template #default="scope">{{ scope.row.metric.unit }}</template>
+                            </el-table-column>
+                            <el-table-column prop="notes" label="备注"></el-table-column>
+                            <el-table-column label="操作" width="150" fixed="right">
+                                <template #default="scope">
+                                    <el-button size="small" type="primary" link @click="handleEditRecord(scope.row)">编辑</el-button>
+                                    <el-popconfirm title="确定要删除这条记录吗？" @confirm="handleDeleteRecord(scope.row)">
+                                        <template #reference>
+                                            <el-button size="small" type="danger" link>删除</el-button>
+                                        </template>
+                                    </el-popconfirm>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+
+                    <!-- 视图 2：批量录入 -->
+                    <div v-show="activeMenu === 'input'" class="page-container">
+                        <h3>批量录入体检指标</h3>
+                        <el-form label-width="100px" style="max-width: 900px; margin-top: 20px;">
+                            <el-form-item label="人员" required>
+                                <el-select v-model="batchForm.person_id" placeholder="选择人员" style="width: 100%;">
+                                    <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="体检日期" required>
+                                <el-date-picker v-model="batchForm.recordDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD"></el-date-picker>
+                            </el-form-item>
+
+                            <el-divider>快速导入 (支持JSON与智能文本解析)</el-divider>
+                            <el-form-item label="原始数据">
+                                <el-input 
+                                    v-model="jsonInput" 
+                                    type="textarea" 
+                                    :rows="4" 
+                                    placeholder='支持两种方式：
+1. 直接粘贴标准JSON，例如：{"体重": "70.8", "收缩压": 120}。
+2. 粘贴自然语言（智能解析），例如："我今天早上称了一下体重，大概是 75.2kg，然后量了血压是 125 毫米汞柱"。'>
+                                </el-input>
+                                <div style="margin-top: 10px; text-align: right; width: 100%;">
+                                    <el-button type="info" plain size="small" @click="parseJsonInput">标准JSON解析</el-button>
+                                    <el-button type="primary" size="small" @click="smartParseInput" :loading="parsingText">
+                                        <el-icon style="margin-right: 5px;"><component :is="icons.MagicStick"></component></el-icon>
+                                        AI 智能解析
+                                    </el-button>
+                                </div>
+                            </el-form-item>
+                            
+                            <el-divider>
+                                指标列表 
+                                <el-tag type="info" size="small" style="margin-left: 10px;">共 {{ validMetricCount }} 项待保存</el-tag>
+                            </el-divider>
+                            
+                            <div v-for="(metric, index) in batchForm.metrics" :key="index" style="display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-start; flex-wrap: wrap;">
+                                <!-- 指标选择 -->
+                                <div style="flex: 0 0 200px;">
+                                    <el-select v-model="metric.metric_id" placeholder="选择指标" style="width: 100%;" @change="onMetricSelectChange(metric)">
+                                        <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
+                                        <el-option label="+ 自定义 (手动填写)" value="custom" style="color: #409EFF; font-weight: bold;"></el-option>
+                                    </el-select>
+                                    <!-- 自定义名称 -->
+                                    <div v-if="metric.metric_id === 'custom'" style="margin-top: 8px;">
+                                        <el-input v-model="metric.customName" placeholder="自定义名称"></el-input>
+                                    </div>
+                                </div>
+                                
+                                <el-input-number v-model="metric.value" :controls="false" placeholder="录入数值" style="flex: 0 0 120px;"></el-input-number>
+                                
+                                <!-- 期望区间展示/编辑 -->
+                                <div style="flex: 0 0 200px;">
+                                    <div v-if="metric.metric_id !== 'custom' && metric.metric_id" style="line-height: 32px; color: #909399; font-size: 13px; background: #f5f7fa; padding: 0 10px; border-radius: 4px;">
+                                        参考: {{ getExpectedRangeStr(metric.metric_id) }}
+                                    </div>
+                                    <div v-else style="display: flex; align-items: center; gap: 5px;">
+                                        <el-input-number v-model="metric.expected_min" :controls="false" placeholder="参考下限" style="width: 90px;"></el-input-number>
+                                        <span>-</span>
+                                        <el-input-number v-model="metric.expected_max" :controls="false" placeholder="参考上限" style="width: 90px;"></el-input-number>
+                                    </div>
+                                </div>
+
+                                <!-- 单位展示/编辑 -->
+                                <div style="flex: 0 0 100px;">
+                                    <div v-if="metric.metric_id !== 'custom' && metric.metric_id" style="line-height: 32px; color: #909399; text-align: center; background: #f5f7fa; border-radius: 4px;">
+                                        {{ getMetricUnit(metric.metric_id) || '无单位' }}
+                                    </div>
+                                    <el-input v-else v-model="metric.customUnit" placeholder="单位(选填)"></el-input>
+                                </div>
+                                
+                                <el-input v-model="metric.notes" placeholder="备注" style="flex: 1; min-width: 150px;"></el-input>
+                                
+                                <el-button type="danger" circle @click="removeBatchItem(index)" :disabled="batchForm.metrics.length === 1">
+                                    <el-icon><component :is="icons.Delete"></component></el-icon>
+                                </el-button>
+                            </div>
+                            
+                            <el-form-item label-width="0" style="margin-top: 20px;">
+                                <el-button type="info" plain @click="addBatchItem" style="width: 100%;">
+                                    <el-icon style="margin-right: 5px;"><component :is="icons.Plus"></component></el-icon> 添加一条指标
+                                </el-button>
+                            </el-form-item>
+                            
+                            <el-form-item label-width="0" style="margin-top: 30px; text-align: center;">
+                                <el-button type="primary" size="large" @click="submitBatch" :loading="submitting">保存所有指标</el-button>
+                                <el-button size="large" @click="activeMenu = 'ledger'">取消</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+
+                    <!-- 视图 3：人员管理 -->
+                    <div v-show="activeMenu === 'persons'" class="page-container">
+                        <div class="toolbar">
+                            <h3>人员管理</h3>
+                            <el-button type="primary" @click="openPersonDialog()">
+                                <el-icon style="margin-right: 5px;"><component :is="icons.Plus"></component></el-icon> 新增人员
+                            </el-button>
+                        </div>
+                        <el-table :data="persons" border style="width: 100%">
+                            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                            <el-table-column prop="name" label="姓名"></el-table-column>
+                            <el-table-column prop="gender" label="性别" width="100">
+                                <template #default="scope">{{ scope.row.gender || '-' }}</template>
+                            </el-table-column>
+                            <el-table-column prop="created_at" label="创建时间" :formatter="row => row.created_at.split('T')[0]"></el-table-column>
+                            <el-table-column label="操作" width="150" fixed="right">
+                                <template #default="scope">
+                                    <el-popconfirm title="删除将级联删除该人员所有记录，确认？" @confirm="handleDeletePerson(scope.row)">
+                                        <template #reference>
+                                            <el-button size="small" type="danger" link>删除</el-button>
+                                        </template>
+                                    </el-popconfirm>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+
+                    <!-- 视图 4：指标管理 -->
+                    <div v-show="activeMenu === 'definitions'" class="page-container">
+                        <div class="toolbar">
+                            <h3>指标定义管理</h3>
+                            <el-button type="primary" @click="openDefDialog()">
+                                <el-icon style="margin-right: 5px;"><component :is="icons.Plus"></component></el-icon> 新增指标
+                            </el-button>
+                        </div>
+                        <el-table :data="definitions" border style="width: 100%">
+                            <el-table-column prop="name" label="指标名称"></el-table-column>
+                            <el-table-column prop="unit" label="单位"></el-table-column>
+                            <el-table-column prop="expected_min" label="期望最小值"></el-table-column>
+                            <el-table-column prop="expected_max" label="期望最大值"></el-table-column>
+                            <el-table-column label="操作" width="150" fixed="right">
+                                <template #default="scope">
+                                    <el-button size="small" type="primary" link @click="openDefDialog(scope.row)">编辑</el-button>
+                                    <el-popconfirm title="删除将级联删除该指标所有记录，确认？" @confirm="handleDeleteDef(scope.row)">
+                                        <template #reference>
+                                            <el-button size="small" type="danger" link>删除</el-button>
+                                        </template>
+                                    </el-popconfirm>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+
+                    <!-- 视图 5：趋势分析 -->
+                    <div v-show="activeMenu === 'analysis'" class="page-container">
+                        <div class="toolbar">
+                            <span style="margin-right: 15px; font-weight: bold;">人员与指标：</span>
+                            <el-select v-model="analysisPersonId" placeholder="选择人员" style="width: 150px; margin-right: 10px;" @change="loadAnalysisChart" clearable>
+                                <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
+                            </el-select>
+                            <el-select v-model="analysisMetricId" placeholder="选择指标" style="width: 250px;" @change="loadAnalysisChart" clearable>
+                                <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
+                            </el-select>
+                        </div>
+                        
+                        <div v-if="!analysisMetricId || !analysisPersonId" style="text-align: center; color: #909399; margin-top: 100px;">
+                            <el-icon style="font-size: 48px;"><component :is="icons.DataAnalysis"></component></el-icon>
+                            <p>请在上方选择人员和指标以查看趋势分析</p>
+                        </div>
+                        
+                        <div v-show="analysisMetricId && analysisPersonId" id="analysis-chart" class="chart-container"></div>
+                    </div>
+                    <div v-show="activeMenu === 'advice'" class="page-container">
+                        <div class="toolbar">
+                            <span style="margin-right: 15px; font-weight: bold;">选择人员：</span>
+                            <el-select v-model="advicePersonId" placeholder="选择人员生成报告" style="width: 200px; margin-right: 10px;">
+                                <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
+                            </el-select>
+                            <el-button type="primary" @click="generateAdvice" :loading="generatingAdvice" :disabled="!advicePersonId">
+                                <el-icon style="margin-right: 5px;"><component :is="icons.Document"></component></el-icon>
+                                智能生成健康建议
+                            </el-button>
+                        </div>
+                        
+                        <div v-if="!adviceHtml && !generatingAdvice" style="text-align: center; color: #909399; margin-top: 100px;">
+                            <el-icon style="font-size: 48px;"><component :is="icons.FirstAidKit"></component></el-icon>
+                            <p>请选择人员并点击“智能生成健康建议”按钮，AI将根据该人员的所有体检记录给出专业建议</p>
+                        </div>
+
+                        <div v-if="generatingAdvice" style="padding: 40px; text-align: center;">
+                            <el-skeleton :rows="5" animated />
+                            <p style="color: #909399; margin-top: 20px;">正在综合分析体检指标并生成健康报告，请稍候...</p>
+                        </div>
+
+                        <div v-if="adviceHtml && !generatingAdvice" style="margin-top: 30px;">
+                            <el-card shadow="never" style="background-color: #f9fafc; border-left: 5px solid #409EFF;">
+                                <div class="advice-content" v-html="adviceHtml" style="line-height: 1.8;"></div>
+                            </el-card>
+                        </div>
+                    </div>
+
+                </el-main>
+            </el-container>
+        </el-container>
+
+        <!-- 人员管理弹窗 -->
+        <el-dialog v-model="personDialogVisible" title="新增人员" width="400px">
+            <el-form :model="personForm" label-width="80px">
+                <el-form-item label="人员姓名" required>
+                    <el-input v-model="personForm.name"></el-input>
+                </el-form-item>
+                <el-form-item label="性别">
+                    <el-radio-group v-model="personForm.gender">
+                        <el-radio label="男">男</el-radio>
+                        <el-radio label="女">女</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="personDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitPerson" :loading="submitting">保存</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 编辑记录弹窗 -->
+        <el-dialog v-model="editRecordDialogVisible" title="编辑记录" width="400px">
+            <el-form :model="editRecordForm" label-width="80px" v-if="editRecordForm">
+                <el-form-item label="体检日期">
+                    <el-date-picker v-model="editRecordForm.record_date" type="date" value-format="YYYY-MM-DD"></el-date-picker>
+                </el-form-item>
+                <el-form-item label="数值">
+                    <el-input-number v-model="editRecordForm.value" :controls="false" style="width: 100%;"></el-input-number>
+                </el-form-item>
+                <el-form-item label="备注">
+                    <el-input v-model="editRecordForm.notes" type="textarea"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="editRecordDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitEditRecord" :loading="submitting">保存</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 指标定义弹窗 -->
+        <el-dialog v-model="defDialogVisible" :title="defForm.id ? '编辑指标' : '新增指标'" width="400px">
+            <el-form :model="defForm" label-width="100px">
+                <el-form-item label="指标名称" required>
+                    <el-input v-model="defForm.name"></el-input>
+                </el-form-item>
+                <el-form-item label="单位">
+                    <el-input v-model="defForm.unit" placeholder="如 kg, mmHg"></el-input>
+                </el-form-item>
+                <el-form-item label="期望最小值">
+                    <el-input-number v-model="defForm.expected_min" :controls="false" style="width: 100%;"></el-input-number>
+                </el-form-item>
+                <el-form-item label="期望最大值">
+                    <el-input-number v-model="defForm.expected_max" :controls="false" style="width: 100%;"></el-input-number>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="defDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitDef" :loading="submitting">保存</el-button>
+            </template>
+        </el-dialog>
+
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, onMounted, nextTick, shallowRef, computed } = Vue;
+        const { ElMessage, ElNotification } = ElementPlus;
+
+        const app = createApp({
+            setup() {
+                const icons = shallowRef(ElementPlusIconsVue);
+                const activeMenu = ref('ledger');
+                const loading = ref(false);
+                const submitting = ref(false);
+                
+                // Shared Definitions
+                const definitions = ref([]);
+                const persons = ref([]);
+
+                const fetchDefinitions = async () => {
+                    try {
+                        const res = await axios.get('/api/v1/definitions/?limit=1000');
+                        definitions.value = res.data;
+                    } catch (error) {
+                        ElMessage.error('获取指标列表失败');
+                    }
+                };
+
+                const fetchPersons = async () => {
+                    try {
+                        const res = await axios.get('/api/v1/persons/?limit=100');
+                        persons.value = res.data;
+                        if (persons.value.length > 0 && !batchForm.person_id) {
+                            batchForm.person_id = persons.value[0].id;
+                        }
+                    } catch (error) {
+                        ElMessage.error('获取人员列表失败');
+                    }
+                };
+
+                // Person Management
+                const personDialogVisible = ref(false);
+                const personForm = reactive({ name: '', gender: '' });
+                const openPersonDialog = () => {
+                    personForm.name = '';
+                    personForm.gender = '';
+                    personDialogVisible.value = true;
+                };
+                const submitPerson = async () => {
+                    if (!personForm.name) return ElMessage.warning('请输入姓名');
+                    submitting.value = true;
+                    try {
+                        await axios.post('/api/v1/persons/', personForm);
+                        ElMessage.success('新增成功');
+                        personDialogVisible.value = false;
+                        fetchPersons();
+                    } catch (e) {
+                        ElMessage.error('新增失败，可能是姓名重复');
+                    } finally {
+                        submitting.value = false;
+                    }
+                };
+                const handleDeletePerson = async (row) => {
+                    try {
+                        await axios.delete(`/api/v1/persons/${row.id}`);
+                        ElMessage.success('删除成功');
+                        fetchPersons();
+                        if (activeMenu.value === 'ledger') fetchRecords();
+                    } catch (e) {
+                        ElMessage.error('删除失败');
+                    }
+                };
+
+                // Ledger State
+                const records = ref([]);
+                const filterDate = ref('');
+                const filterPersonId = ref('');
+                const filterMetricId = ref('');
+                const editRecordDialogVisible = ref(false);
+                const editRecordForm = ref(null);
+
+                const fetchRecords = async () => {
+                    loading.value = true;
+                    try {
+                        let url = '/api/v1/metrics/?limit=1000';
+                        if (filterDate.value) url += `&record_date=${filterDate.value}`;
+                        if (filterMetricId.value) url += `&metric_id=${filterMetricId.value}`;
+                        if (filterPersonId.value) url += `&person_id=${filterPersonId.value}`;
+                        
+                        const res = await axios.get(url);
+                        records.value = res.data;
+                    } catch (error) {
+                        ElMessage.error('获取台账数据失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const formatExpectedRange = (metric) => {
+                    if (metric.expected_min != null && metric.expected_max != null) return `${metric.expected_min} - ${metric.expected_max}`;
+                    if (metric.expected_min != null) return `≥ ${metric.expected_min}`;
+                    if (metric.expected_max != null) return `≤ ${metric.expected_max}`;
+                    return '-';
+                };
+
+                const getValueClass = (value, metric) => {
+                    if (metric.expected_min != null && value < metric.expected_min) return 'abnormal-value';
+                    if (metric.expected_max != null && value > metric.expected_max) return 'abnormal-value';
+                    return 'normal-value';
+                };
+
+                // Input State
+                const jsonInput = ref('');
+                const batchForm = reactive({
+                    person_id: '',
+                    recordDate: new Date().toISOString().split('T')[0],
+                    metrics: []
+                });
+
+                const validMetricCount = computed(() => {
+                    return batchForm.metrics.filter(m => {
+                        if (m.value === undefined || m.value === null) return false;
+                        if (m.metric_id === 'custom') return !!m.customName;
+                        return !!m.metric_id;
+                    }).length;
+                });
+
+                const getMetricUnit = (id) => {
+                    const def = definitions.value.find(d => d.id === id);
+                    return def ? def.unit : '';
+                };
+
+                const getExpectedRangeStr = (id) => {
+                    const def = definitions.value.find(d => d.id === id);
+                    if (!def) return '-';
+                    return formatExpectedRange(def);
+                };
+
+                const onMetricSelectChange = (metric) => {
+                    if (metric.metric_id !== 'custom') {
+                        metric.customName = '';
+                        metric.customUnit = '';
+                        metric.expected_min = undefined;
+                        metric.expected_max = undefined;
+                    }
+                };
+
+                const addBatchItem = () => {
+                    batchForm.metrics.push({ metric_id: null, customName: '', customUnit: '', expected_min: undefined, expected_max: undefined, value: undefined, notes: '' });
+                };
+
+                const removeBatchItem = (index) => {
+                    batchForm.metrics.splice(index, 1);
+                };
+
+                const processParsedData = async (parsedData, notesSuffix) => {
+                    let count = 0;
+                    for (const [key, valueObj] of Object.entries(parsedData)) {
+                        // 兼容旧的只返回数字的格式，以及新的返回对象的格式
+                        let numValue, unit, expectedMin, expectedMax;
+                        if (typeof valueObj === 'object' && valueObj !== null) {
+                            numValue = parseFloat(valueObj.value);
+                            unit = valueObj.unit || '';
+                            expectedMin = valueObj.expected_min;
+                            expectedMax = valueObj.expected_max;
+                        } else {
+                            numValue = parseFloat(valueObj);
+                            unit = '';
+                        }
+                        
+                        if (isNaN(numValue)) continue;
+
+                        let def = definitions.value.find(d => d.name === key);
+                        
+                        // 如果 AI 解析出了期望区间或单位，但系统没有这个指标，先帮用户自动在后台创建一个
+                        if (!def && (unit || expectedMin != null || expectedMax != null)) {
+                            try {
+                                const newDefRes = await axios.post('/api/v1/definitions/', {
+                                    name: key,
+                                    unit: unit,
+                                    expected_min: expectedMin,
+                                    expected_max: expectedMax
+                                });
+                                def = newDefRes.data;
+                                // 刷新一下本地缓存的指标库
+                                definitions.value.push(def);
+                            } catch (e) {
+                                console.error('Auto create definition failed', e);
+                            }
+                        }
+
+                        const existingRow = batchForm.metrics.find(m => 
+                            (def && m.metric_id === def.id) || (m.metric_id === 'custom' && m.customName === key)
+                        );
+
+                        if (existingRow && (existingRow.value === undefined || existingRow.value === null)) {
+                            existingRow.value = numValue;
+                        } else {
+                            batchForm.metrics.push({
+                                metric_id: def ? def.id : 'custom',
+                                customName: def ? '' : key,
+                                customUnit: def ? '' : unit,
+                                expected_min: def ? undefined : expectedMin,
+                                expected_max: def ? undefined : expectedMax,
+                                value: numValue,
+                                notes: notesSuffix
+                            });
+                        }
+                        count++;
+                    }
+                    return count;
+                };
+
+                const parseJsonInput = async () => {
+                    if (!jsonInput.value.trim()) return ElMessage.warning('请输入 JSON 数据');
+                    try {
+                        const parsedData = JSON.parse(jsonInput.value);
+                        if (typeof parsedData !== 'object' || Array.isArray(parsedData)) return ElMessage.error('JSON 格式应为键值对对象');
+
+                        const count = await processParsedData(parsedData, 'JSON导入');
+                        if (count > 0) {
+                            ElMessage.success(`导入了 ${count} 项`);
+                            jsonInput.value = '';
+                        }
+                    } catch (e) {
+                        ElMessage.error('JSON 解析失败');
+                    }
+                };
+
+                const parsingText = ref(false);
+                const smartParseInput = async () => {
+                    if (!jsonInput.value.trim()) return ElMessage.warning('请输入需要解析的文本');
+                    
+                    parsingText.value = true;
+                    try {
+                        const res = await axios.post('/api/v1/smart/', { text: jsonInput.value });
+                        const parsedData = res.data;
+                        
+                        if (Object.keys(parsedData).length === 0) {
+                            ElMessage.warning('未能在文本中识别到任何指标数据');
+                            return;
+                        }
+                        
+                        const count = await processParsedData(parsedData, 'AI 智能解析');
+                        if (count > 0) {
+                            ElMessage.success(`AI 成功提取了 ${count} 项指标`);
+                            jsonInput.value = '';
+                        }
+                    } catch (error) {
+                        const errorMsg = error.response?.data?.detail || '智能解析请求失败';
+                        ElMessage.error(errorMsg);
+                    } finally {
+                        parsingText.value = false;
+                    }
+                };
+
+                const submitBatch = async () => {
+                    if (!batchForm.person_id) return ElMessage.warning('请选择人员');
+                    if (!batchForm.recordDate) return ElMessage.warning('请选择体检日期');
+                    
+                    const payloadMetrics = [];
+                    for (const m of batchForm.metrics) {
+                        if (m.value === undefined || m.value === null) continue;
+                        if (m.metric_id === 'custom') {
+                            if (!m.customName) {
+                                ElMessage.warning('自定义指标必须填写名称');
+                                return;
+                            }
+                            payloadMetrics.push({ 
+                                name: m.customName, 
+                                unit: m.customUnit, 
+                                expected_min: m.expected_min,
+                                expected_max: m.expected_max,
+                                value: m.value, 
+                                notes: m.notes 
+                            });
+                        } else if (m.metric_id) {
+                            payloadMetrics.push({ metric_id: m.metric_id, value: m.value, notes: m.notes });
+                        }
+                    }
+                    
+                    if (payloadMetrics.length === 0) return ElMessage.warning('请至少填写一项完整指标');
+
+                    submitting.value = true;
+                    try {
+                        await axios.post('/api/v1/metrics/batch', {
+                            person_id: batchForm.person_id,
+                            record_date: batchForm.recordDate,
+                            metrics: payloadMetrics
+                        });
+                        ElNotification.success('指标批量录入成功');
+                        batchForm.metrics = [];
+                        addBatchItem();
+                        await fetchDefinitions(); // 刷新定义列表（可能新建了自定义指标）
+                        activeMenu.value = 'ledger';
+                        fetchRecords();
+                    } catch (error) {
+                        ElMessage.error('录入失败');
+                    } finally {
+                        submitting.value = false;
+                    }
+                };
+
+                // Definitions Management
+                const defDialogVisible = ref(false);
+                const defForm = reactive({ id: null, name: '', unit: '', expected_min: undefined, expected_max: undefined });
+
+                const openDefDialog = (row = null) => {
+                    if (row) {
+                        Object.assign(defForm, row);
+                    } else {
+                        Object.assign(defForm, { id: null, name: '', unit: '', expected_min: undefined, expected_max: undefined });
+                    }
+                    defDialogVisible.value = true;
+                };
+
+                const submitDef = async () => {
+                    if (!defForm.name) return ElMessage.warning('指标名称必填');
+                    submitting.value = true;
+                    try {
+                        if (defForm.id) {
+                            await axios.put(`/api/v1/definitions/${defForm.id}`, defForm);
+                            ElMessage.success('更新成功');
+                        } else {
+                            await axios.post('/api/v1/definitions/', defForm);
+                            ElMessage.success('创建成功');
+                        }
+                        defDialogVisible.value = false;
+                        fetchDefinitions();
+                    } catch (e) {
+                        ElMessage.error('保存失败');
+                    } finally {
+                        submitting.value = false;
+                    }
+                };
+
+                const handleDeleteDef = async (row) => {
+                    try {
+                        await axios.delete(`/api/v1/definitions/${row.id}`);
+                        ElMessage.success('删除成功');
+                        fetchDefinitions();
+                        if (activeMenu.value === 'ledger') fetchRecords();
+                    } catch (e) {
+                        ElMessage.error('删除失败');
+                    }
+                };
+
+                // Ledger Operations
+                const handleEditRecord = (row) => {
+                    editRecordForm.value = { ...row };
+                    editRecordDialogVisible.value = true;
+                };
+
+                const submitEditRecord = async () => {
+                    submitting.value = true;
+                    try {
+                        await axios.put(`/api/v1/metrics/${editRecordForm.value.id}`, {
+                            value: editRecordForm.value.value,
+                            record_date: editRecordForm.value.record_date,
+                            notes: editRecordForm.value.notes
+                        });
+                        ElMessage.success('更新成功');
+                        editRecordDialogVisible.value = false;
+                        fetchRecords();
+                    } catch (error) {
+                        ElMessage.error('更新失败');
+                    } finally {
+                        submitting.value = false;
+                    }
+                };
+
+                const handleDeleteRecord = async (row) => {
+                    try {
+                        await axios.delete(`/api/v1/metrics/${row.id}`);
+                        ElMessage.success('删除成功');
+                        fetchRecords();
+                    } catch (error) {
+                        ElMessage.error('删除失败');
+                    }
+                };
+
+                // Analysis
+                const analysisPersonId = ref('');
+                const analysisMetricId = ref('');
+                let chartInstance = null;
+
+                const loadAnalysisChart = async () => {
+                    if (!analysisMetricId.value || !analysisPersonId.value) return;
+                    
+                    const def = definitions.value.find(d => d.id === analysisMetricId.value);
+                    if (!def) return;
+
+                    try {
+                        const res = await axios.get(`/api/v1/metrics/${analysisMetricId.value}/history?person_id=${analysisPersonId.value}`);
+                        const data = res.data;
+                        
+                        const dom = document.getElementById('analysis-chart');
+                        if (!dom) return;
+                        if (!chartInstance) chartInstance = echarts.init(dom);
+                        
+                        const dates = data.map(d => d.record_date);
+                        const values = data.map(d => d.value);
+                        
+                        // 构建 markArea（期望区间）
+                        const markArea = {
+                            itemStyle: { color: 'rgba(103, 194, 58, 0.15)' }, // 淡绿色
+                            data: []
+                        };
+                        if (def.expected_min != null && def.expected_max != null) {
+                            markArea.data.push([{ yAxis: def.expected_min }, { yAxis: def.expected_max }]);
+                        } else if (def.expected_min != null) {
+                            // 只有最小值
+                            markArea.data.push([{ yAxis: def.expected_min }, { yAxis: 'max' }]);
+                        } else if (def.expected_max != null) {
+                            // 只有最大值
+                            markArea.data.push([{ yAxis: 'min' }, { yAxis: def.expected_max }]);
+                        }
+
+                        const option = {
+                            title: { text: `${def.name} 趋势变化`, left: 'center' },
+                            tooltip: { trigger: 'axis', formatter: `{b} <br/> 数值: {c} ${def.unit || ''}` },
+                            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                            xAxis: { type: 'category', boundaryGap: false, data: dates },
+                            yAxis: { type: 'value', name: def.unit ? `(${def.unit})` : '', scale: true },
+                            series: [
+                                {
+                                    name: def.name,
+                                    type: 'line',
+                                    smooth: true,
+                                    data: values,
+                                    itemStyle: { color: '#409EFF' },
+                                    areaStyle: {
+                                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                            { offset: 0, color: 'rgba(64,158,255,0.3)' },
+                                            { offset: 1, color: 'rgba(64,158,255,0.05)' }
+                                        ])
+                                    },
+                                    markArea: markArea.data.length > 0 ? markArea : undefined
+                                }
+                            ]
+                        };
+                        
+                        chartInstance.setOption(option);
+                    } catch (error) {
+                        ElMessage.error('加载图表数据失败');
+                    }
+                };
+
+                const handleSelect = (key) => {
+                    activeMenu.value = key;
+                    if (key === 'ledger') fetchRecords();
+                    if (key === 'analysis' && analysisMetricId.value && analysisPersonId.value) nextTick(() => loadAnalysisChart());
+                };
+
+                // Health Advice
+                const advicePersonId = ref('');
+                const adviceHtml = ref('');
+                const generatingAdvice = ref(false);
+
+                const generateAdvice = async () => {
+                    if (!advicePersonId.value) return;
+                    generatingAdvice.value = true;
+                    adviceHtml.value = '';
+                    
+                    const loadingMsg = ElMessage({
+                        message: 'AI 医生正在分析您的所有体检指标历史，撰写专属健康报告，请稍候...',
+                        type: 'info',
+                        duration: 0, // 不自动关闭
+                        icon: icons.value.Loading
+                    });
+                    
+                    try {
+                        const res = await axios.post('/api/v1/smart/advice', { person_id: advicePersonId.value });
+                        // Use marked.js to convert Markdown to HTML
+                        adviceHtml.value = marked.parse(res.data.advice);
+                        ElMessage.success('健康报告生成完毕！');
+                    } catch (error) {
+                        const errorMsg = error.response?.data?.detail || '生成建议失败';
+                        ElMessage.error(errorMsg);
+                    } finally {
+                        loadingMsg.close();
+                        generatingAdvice.value = false;
+                    }
+                };
+
+                onMounted(async () => {
+                    await fetchPersons();
+                    await fetchDefinitions();
+                    fetchRecords();
+                    addBatchItem(); // 初始化一行空指标
+                    window.addEventListener('resize', () => {
+                        if (chartInstance) chartInstance.resize();
+                    });
+                });
+
+                return {
+                    icons, activeMenu, handleSelect, loading, submitting,
+                    definitions, fetchDefinitions, defDialogVisible, defForm, openDefDialog, submitDef, handleDeleteDef,
+                    persons, fetchPersons, personDialogVisible, personForm, openPersonDialog, submitPerson, handleDeletePerson,
+                    records, filterDate, filterPersonId, filterMetricId, fetchRecords, formatExpectedRange, getValueClass,
+                    editRecordDialogVisible, editRecordForm, handleEditRecord, submitEditRecord, handleDeleteRecord,
+                    batchForm, jsonInput, getMetricUnit, getExpectedRangeStr, onMetricSelectChange, addBatchItem, removeBatchItem, parseJsonInput, parsingText, smartParseInput, submitBatch, validMetricCount,
+                    analysisPersonId, analysisMetricId, loadAnalysisChart,
+                    advicePersonId, adviceHtml, generatingAdvice, generateAdvice
+                };
+            }
+        });
+        
+        app.use(ElementPlus, { size: 'default' });
+        for (const [key, component] of Object.entries(ElementPlusIconsVue)) { app.component(key, component); }
+        app.mount('#app');
+    </script>
+</body>
+</html>
