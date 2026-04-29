@@ -29,3 +29,12 @@ async def read_index():
         with open(index_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>Welcome to Health Metrics API</h1><p>API is running. Visit <a href='/docs'>/docs</a> for API documentation.</p>")
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def read_login():
+    login_path = os.path.join(static_dir, "login.html")
+    if os.path.exists(login_path):
+        with open(login_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Login page not found</h1>")

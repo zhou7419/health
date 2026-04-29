@@ -6,6 +6,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./database/app.db"
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_api_key: str = ""
+    secret_key: str = ""
+    admin_username: str = "admin"
+    admin_password: str = ""
+    access_token_expires_minutes: int = 10080
+    login_lock_max_failures: int = 3
+    login_lock_minutes: int = 30
 
     class Config:
         env_file = ".env"

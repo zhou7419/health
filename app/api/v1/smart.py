@@ -5,12 +5,12 @@ import json
 import re
 
 from app.schemas.metric import SmartParseRequest, HealthAdviceRequest
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.crud import metric as crud_metric
 from app.config import settings
 from app.utils.logger import get_logger
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
 
 MODEL_NAME = "deepseek-chat"

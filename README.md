@@ -12,7 +12,10 @@ pip install -r requirements.txt
 
 2. 配置环境变量
 
-复制 `.env.example` 为 `.env`，并填写 `DEEPSEEK_API_KEY`。
+复制 `.env.example` 为 `.env`，并填写：
+- `DEEPSEEK_API_KEY`（智能解析/健康建议需要）
+- `SECRET_KEY`（登录 token 签名需要）
+- `ADMIN_PASSWORD`（登录密码）
 
 3. 启动服务
 
@@ -40,6 +43,9 @@ docker run -d --name health \
   -e DATABASE_URL="sqlite:///./database/app.db" \
   -e DEEPSEEK_BASE_URL="https://api.deepseek.com" \
   -e DEEPSEEK_API_KEY="YOUR_KEY" \
+  -e SECRET_KEY="YOUR_SECRET" \
+  -e ADMIN_USERNAME="admin" \
+  -e ADMIN_PASSWORD="YOUR_PASSWORD" \
   -v "$(pwd)/database:/app/database" \
   --restart unless-stopped \
   zhou7419/health:latest
@@ -51,5 +57,6 @@ docker run -d --name health \
 
 1. 在 1Panel 的容器/编排里新建 Compose 应用，粘贴 `docker-compose.yml` 内容
 2. 把 `DEEPSEEK_API_KEY` 改成你自己的 key（不要留空）
-3. 挂载卷保持数据持久化：把宿主机某个目录映射到容器 `/app/database`
-4. 启动后通过 8000 端口访问
+3. 把 `SECRET_KEY` / `ADMIN_PASSWORD` 填好（否则无法登录）
+4. 挂载卷保持数据持久化：把宿主机某个目录映射到容器 `/app/database`
+5. 启动后通过 8000 端口访问

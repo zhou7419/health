@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.schemas.metric import MetricRecordResponse, BatchMetricCreate, MetricRecordUpdate
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
 
 @router.post("/batch", response_model=List[MetricRecordResponse])

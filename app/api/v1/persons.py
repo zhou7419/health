@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.schemas.metric import PersonResponse, PersonCreate
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
 
 @router.get("/", response_model=List[PersonResponse])

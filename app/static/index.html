@@ -37,6 +37,10 @@
             <el-header>
                 <el-icon class="logo"><component :is="icons.DataBoard"></component></el-icon>
                 个人体检指标管理台账
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px; padding-right: 10px;">
+                    <el-tag v-if="isAuthed" type="success" effect="dark">已登录：{{ authUser || 'admin' }}</el-tag>
+                    <el-button v-if="isAuthed" size="small" @click="logout">退出登录</el-button>
+                </div>
             </el-header>
             
             <el-container>
@@ -388,12 +392,51 @@
         const { createApp, ref, reactive, onMounted, nextTick, shallowRef, computed } = Vue;
         const { ElMessage, ElNotification } = ElementPlus;
 
+        let axiosInterceptorsInstalled = false;
+        axios.interceptors.request.use((config) => {
+            const t = localStorage.getItem('access_token') || '';
+            if (t) {
+                config.headers = config.headers || {};
+                config.headers.Authorization = `Bearer ${t}`;
+            }
+            return config;
+        });
+
         const app = createApp({
             setup() {
                 const icons = shallowRef(ElementPlusIconsVue);
                 const activeMenu = ref('ledger');
                 const loading = ref(false);
                 const submitting = ref(false);
+
+                const token = ref(localStorage.getItem('access_token') || '');
+                const authUser = ref('');
+                const isAuthed = computed(() => !!token.value);
+
+                const logout = () => {
+                    token.value = '';
+                    localStorage.removeItem('access_token');
+                    authUser.value = '';
+                    window.location.replace('/login');
+                };
+
+                if (!axiosInterceptorsInstalled) {
+                    axiosInterceptorsInstalled = true;
+                    axios.interceptors.response.use(
+                        (resp) => resp,
+                        (error) => {
+                            const status = error?.response?.status;
+                            if (status === 401) {
+                                logout();
+                                ElMessage.error('请先登录');
+                            } else if (status === 429) {
+                                const msg = error.response?.data?.detail || '请求过于频繁';
+                                ElMessage.error(msg);
+                            }
+                            return Promise.reject(error);
+                        }
+                    );
+                }
                 
                 // Shared Definitions
                 const definitions = ref([]);
@@ -866,10 +909,20 @@
                 };
 
                 onMounted(async () => {
-                    await fetchPersons();
-                    await fetchDefinitions();
-                    fetchRecords();
-                    addBatchItem(); // 初始化一行空指标
+                    if (token.value) {
+                        try {
+                            const me = await axios.get('/api/v1/auth/me');
+                            authUser.value = me.data.username || '';
+                            await fetchPersons();
+                            await fetchDefinitions();
+                            fetchRecords();
+                            addBatchItem();
+                        } catch (e) {
+                            logout();
+                        }
+                    } else {
+                        window.location.replace('/login');
+                    }
                     window.addEventListener('resize', () => {
                         if (chartInstance) chartInstance.resize();
                     });
@@ -883,7 +936,8 @@
                     editRecordDialogVisible, editRecordForm, handleEditRecord, submitEditRecord, handleDeleteRecord,
                     batchForm, jsonInput, getMetricUnit, getExpectedRangeStr, onMetricSelectChange, addBatchItem, removeBatchItem, parseJsonInput, parsingText, smartParseInput, submitBatch, validMetricCount,
                     analysisPersonId, analysisMetricId, loadAnalysisChart,
-                    advicePersonId, adviceHtml, generatingAdvice, generateAdvice
+                    advicePersonId, adviceHtml, generatingAdvice, generateAdvice,
+                    logout, isAuthed, authUser
                 };
             }
         });

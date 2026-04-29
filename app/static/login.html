@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 体检指标管理台账</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.3.12/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.3.12/dist/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        :root {
+            --brand: #409EFF;
+            --text: #303133;
+            --muted: #909399;
+            --bg1: #f5f7ff;
+            --bg2: #eef6ff;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif; background: radial-gradient(1200px 600px at 15% 20%, rgba(64, 158, 255, 0.18), transparent 60%), radial-gradient(900px 500px at 85% 25%, rgba(103, 194, 58, 0.12), transparent 60%), linear-gradient(180deg, var(--bg1), var(--bg2)); }
+        #app { height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; position: relative; overflow: hidden; }
+        #app::before {
+            content: "";
+            position: absolute;
+            inset: -200px;
+            background-image:
+                radial-gradient(circle at 1px 1px, rgba(64, 158, 255, 0.12) 1px, transparent 1px);
+            background-size: 18px 18px;
+            transform: rotate(-8deg);
+            opacity: 0.55;
+            pointer-events: none;
+        }
+        .wrap { width: 100%; max-width: 980px; display: grid; grid-template-columns: 1fr 420px; gap: 28px; align-items: center; position: relative; z-index: 1; }
+        .hero { padding: 16px 12px; }
+        .hero-title { font-size: 34px; line-height: 1.2; font-weight: 800; color: var(--text); letter-spacing: 0.5px; margin: 0 0 14px; }
+        .hero-sub { color: rgba(48, 49, 51, 0.72); font-size: 14px; line-height: 1.7; margin: 0; }
+        .badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        .badge { padding: 6px 10px; border-radius: 999px; font-size: 12px; color: rgba(48, 49, 51, 0.72); background: rgba(255, 255, 255, 0.65); border: 1px solid rgba(255, 255, 255, 0.75); backdrop-filter: blur(8px); }
+        .card { width: 100%; background: rgba(255, 255, 255, 0.9); border-radius: 14px; box-shadow: 0 18px 60px rgba(17, 24, 39, 0.12); padding: 26px 26px 18px; border: 1px solid rgba(255, 255, 255, 0.65); backdrop-filter: blur(10px); animation: pop 320ms ease-out; }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .brand-mark { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, rgba(64, 158, 255, 1), rgba(64, 158, 255, 0.55)); box-shadow: 0 10px 24px rgba(64, 158, 255, 0.25); }
+        .brand-text { display: flex; flex-direction: column; }
+        .title { font-size: 18px; font-weight: 800; color: var(--text); margin: 0; }
+        .sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+        .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: rgba(144, 147, 153, 0.9); font-size: 12px; }
+        .link { color: var(--brand); text-decoration: none; }
+        .link:hover { text-decoration: underline; }
+        @keyframes pop {
+            from { transform: translateY(8px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @media (max-width: 920px) {
+            .wrap { grid-template-columns: 1fr; max-width: 460px; }
+            .hero { text-align: center; padding: 0; }
+            .badges { justify-content: center; }
+            .hero-title { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="wrap">
+            <div class="hero">
+                <h1 class="hero-title">体检指标管理台账</h1>
+                <p class="hero-sub">记录、对比、趋势分析与智能建议。一个界面管理多人员、多指标的体检数据。</p>
+            </div>
+
+            <div class="card">
+                <div class="brand">
+                    <div class="brand-mark"></div>
+                    <div class="brand-text">
+                        <p class="title">登录</p>
+                        <p class="sub">请输入账号密码进入系统</p>
+                    </div>
+                </div>
+                <el-form :model="form" label-width="80px">
+                    <el-form-item label="用户名" required>
+                        <el-input v-model="form.username" autocomplete="username"></el-input>
+                    </el-form-item>
+                    <el-form-item label="密码" required>
+                        <el-input v-model="form.password" type="password" show-password autocomplete="current-password" @keyup.enter="login"></el-input>
+                    </el-form-item>
+                    <el-form-item label-width="0" style="margin-top: 10px;">
+                        <el-button type="primary" style="width: 100%;" @click="login" :loading="loading">登录</el-button>
+                    </el-form-item>
+                </el-form>
+                <div class="footer">
+                    <span></span>
+                    <a class="link" href="/" @click.prevent="goHome">返回首页</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, reactive, ref, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        const app = createApp({
+            setup() {
+                const loading = ref(false);
+                const form = reactive({ username: 'admin', password: '' });
+
+                const login = async () => {
+                    if (!form.username || !form.password) return ElMessage.warning('请输入用户名和密码');
+                    loading.value = true;
+                    try {
+                        const res = await axios.post('/api/v1/auth/login', {
+                            username: form.username,
+                            password: form.password
+                        });
+                        localStorage.setItem('access_token', res.data.access_token);
+                        window.location.replace('/');
+                    } catch (e) {
+                        const msg = e.response?.data?.detail || '登录失败';
+                        ElMessage.error(msg);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const goHome = () => {
+                    window.location.replace('/');
+                };
+
+                onMounted(() => {
+                    const t = localStorage.getItem('access_token') || '';
+                    if (t) window.location.replace('/');
+                });
+
+                return { form, loading, login, goHome };
+            }
+        });
+
+        app.use(ElementPlus, { size: 'default' });
+        app.mount('#app');
+    </script>
+</body>
+</html>
