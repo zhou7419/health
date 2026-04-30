@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     login_lock_max_failures: int = 3
     login_lock_minutes: int = 30
 
-    class Config:
-        env_file = ".env"
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 settings = Settings()
