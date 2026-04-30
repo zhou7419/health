@@ -10,7 +10,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY app /app/app
 COPY scripts /app/scripts
-COPY README.md /app/README.md
 COPY .env.example /app/.env.example
 
 RUN mkdir -p /app/database

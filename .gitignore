@@ -1,16 +1,24 @@
+# Backend
 .env
 .env.*
 !.env.example
-
-database/app.db
+backend/database/app.db
 server.log
-
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
-
 .venv/
 venv/
+backend/.venv/
+backend/venv/
 
+# Frontend
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/*.local
+
+# Editor
 .trae/
+.vscode/

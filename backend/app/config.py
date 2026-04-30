@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     secret_key: str = ""
     admin_username: str = "admin"
-    admin_password: str = ""
+    admin_password: str = "zhouyou123"
     access_token_expires_minutes: int = 10080
     login_lock_max_failures: int = 3
     login_lock_minutes: int = 30

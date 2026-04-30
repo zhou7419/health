@@ -1,34 +1,29 @@
 services:
-  health:
+  backend:
     build:
-      context: .
-      # 👇 建议添加 dockerfile 明确指定（如有自定义名称）
-      # dockerfile: Dockerfile
-    image: zhou7419/health:latest
-    ports:
-      - "8000:8000"
+      context: ./backend
+    image: zhou7419/health-backend:latest
     environment:
-      DATABASE_URL: "sqlite:///app/database/app.db"  # 👈 路径建议用绝对路径（容器内）
+      DATABASE_URL: "sqlite:///app/database/app.db"
       DEEPSEEK_BASE_URL: "https://api.deepseek.com"
       DEEPSEEK_API_KEY: ""
       SECRET_KEY: ""
       ADMIN_USERNAME: "admin"
       ADMIN_PASSWORD: ""
     volumes:
-      # 👇 方案A（推荐）：使用 1Panel 管理的命名卷，更稳定
       - health-db-data:/app/database
-      # 👇 方案B：如果坚持用宿主机路径，请写 1Panel 中的绝对路径
-      # - /opt/1panel/data/app/health/database:/app/database
     restart: unless-stopped
-    # 👇 建议添加健康检查，便于 1Panel 监控状态
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
-# 👇 在文件末尾声明命名卷（方案A 必需）
+  web:
+    build:
+      context: ./web
+    image: zhou7419/health-web:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   health-db-data:
     driver: local
