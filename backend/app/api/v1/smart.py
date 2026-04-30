@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 import httpx
 import json
 import re
+import os
+from typing import List
+import base64
 
 from app.schemas.metric import SmartParseRequest, HealthAdviceRequest
 from app.api.deps import get_current_user, get_db
@@ -49,11 +52,22 @@ async def parse_smart_text(request: SmartParseRequest):
 "{request.text}"
 """
     
+    user_content = []
+    if request.images:
+        user_content.append({"type": "text", "text": prompt})
+        for img in request.images:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": img}
+            })
+    else:
+        user_content = prompt
+
     payload = {
         "model": MODEL_NAME,
         "messages": [
             {"role": "system", "content": "你是一个严格输出JSON格式数据的医疗数据提取助手。"},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": user_content}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.1
@@ -85,6 +99,58 @@ async def parse_smart_text(request: SmartParseRequest):
     except Exception as e:
         logger.error(f"Unexpected error in smart parse: {str(e)}")
         raise HTTPException(status_code=500, detail="智能解析过程发生未知错误")
+
+@router.post("/upload")
+async def parse_smart_file(files: List[UploadFile] = File(...)):
+    """
+    上传文件（支持多图、PDF 或 TXT），提取文本或图片后使用 DeepSeek 智能解析
+    """
+    text_content = ""
+    images_base64 = []
+
+    for file in files:
+        content = await file.read()
+        filename = file.filename.lower()
+
+        if filename.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):
+            encoded = base64.b64encode(content).decode('utf-8')
+            mime_type = "image/jpeg"
+            if filename.endswith('.png'): mime_type = "image/png"
+            elif filename.endswith('.webp'): mime_type = "image/webp"
+            elif filename.endswith('.gif'): mime_type = "image/gif"
+            images_base64.append(f"data:{mime_type};base64,{encoded}")
+        elif filename.endswith('.pdf'):
+            try:
+                import PyPDF2
+                import io
+                reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text_content += extracted + "\n"
+            except Exception as e:
+                logger.error(f"Failed to parse PDF {filename}: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"PDF解析失败: {filename} - {str(e)}")
+        else:
+            # 尝试解码为文本
+            try:
+                text_content += content.decode('utf-8') + "\n"
+            except UnicodeDecodeError:
+                try:
+                    text_content += content.decode('gbk') + "\n"
+                except UnicodeDecodeError:
+                    raise HTTPException(status_code=400, detail=f"不支持的文件格式或编码: {filename}，仅支持图片、PDF和文本文件")
+
+    text_content = text_content.strip()
+    if not text_content and not images_base64:
+        raise HTTPException(status_code=400, detail="未能从文件中提取到有效内容")
+
+    # 限制文本长度避免超出上下文 (截取前 8000 个字符)
+    request = SmartParseRequest(
+        text=text_content[:8000] if text_content else "请从以下图片中提取所有的体检指标数据：",
+        images=images_base64 if images_base64 else None
+    )
+    return await parse_smart_text(request)
 
 @router.post("/advice")
 async def generate_health_advice(request: HealthAdviceRequest, db: Session = Depends(get_db)):

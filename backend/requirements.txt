@@ -6,3 +6,6 @@ pydantic-settings==2.5.0
 python-dotenv==1.0.0
 jinja2
 httpx
+python-multipart
+PyPDF2
+aiofiles

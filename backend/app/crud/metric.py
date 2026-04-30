@@ -144,3 +144,12 @@ def delete_metric(db: Session, record_id: int) -> bool:
     db.delete(db_record)
     db.commit()
     return True
+
+def delete_metrics_by_date(db: Session, record_date: date, person_id: Optional[int] = None) -> int:
+    query = db.query(MetricRecord).filter(MetricRecord.record_date == record_date)
+    if person_id is not None:
+        query = query.filter(MetricRecord.person_id == person_id)
+    
+    deleted_count = query.delete(synchronize_session=False)
+    db.commit()
+    return deleted_count

@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
+import csv
+import io
 
 from app.api.deps import get_current_user, get_db
-from app.schemas.metric import MetricRecordResponse, BatchMetricCreate, MetricRecordUpdate
+from app.schemas.metric import MetricRecordResponse, BatchMetricCreate, MetricRecordUpdate, MetricItemCreate
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
@@ -22,6 +24,68 @@ def create_metrics_batch(
     logger.info(f"Creating batch metrics for date {batch_in.record_date}")
     metrics = crud_metric.create_metrics_batch(db=db, batch_in=batch_in)
     return metrics
+
+@router.post("/batch/upload", response_model=List[MetricRecordResponse])
+async def upload_metrics_batch(
+    person_id: int = Form(...),
+    record_date: date = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    通过上传CSV文件批量录入指标
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+    
+    try:
+        content = await file.read()
+        # Decode CSV content
+        decoded_content = content.decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(decoded_content))
+        
+        items = []
+        for row in reader:
+            # Skip empty rows or rows without name and value
+            if not row.get('指标名称') or not row.get('数值'):
+                continue
+                
+            try:
+                value = float(row.get('数值'))
+            except ValueError:
+                continue # Skip invalid numbers
+                
+            expected_min = row.get('参考下限')
+            expected_max = row.get('参考上限')
+            
+            item = MetricItemCreate(
+                name=row.get('指标名称').strip(),
+                value=value,
+                unit=row.get('单位', '').strip() or None,
+                expected_min=float(expected_min) if expected_min else None,
+                expected_max=float(expected_max) if expected_max else None,
+                notes=row.get('备注', '').strip() or None
+            )
+            items.append(item)
+            
+        if not items:
+            raise HTTPException(status_code=400, detail="No valid metric data found in the CSV file")
+            
+        batch_in = BatchMetricCreate(
+            person_id=person_id,
+            record_date=record_date,
+            metrics=items
+        )
+        
+        logger.info(f"Creating batch metrics from upload for date {record_date}, {len(items)} items")
+        metrics = crud_metric.create_metrics_batch(db=db, batch_in=batch_in)
+        return metrics
+        
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File encoding must be UTF-8")
+    except Exception as e:
+        logger.error(f"Error processing uploaded file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
 
 
 
@@ -79,3 +143,15 @@ def delete_metric(
     if not success:
         raise HTTPException(status_code=404, detail="Metric record not found")
     return {"message": "Successfully deleted"}
+
+@router.delete("/date/{record_date}")
+def delete_metrics_by_date(
+    record_date: date,
+    person_id: Optional[int] = Query(None, description="可选：如果指定了人员ID，则只删除该人员在这一天的体检数据"),
+    db: Session = Depends(get_db)
+):
+    """
+    删除指定日期的所有体检数据
+    """
+    deleted_count = crud_metric.delete_metrics_by_date(db, record_date=record_date, person_id=person_id)
+    return {"message": f"Successfully deleted {deleted_count} records", "deleted_count": deleted_count}

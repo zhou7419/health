@@ -9,6 +9,11 @@
         <el-select v-model="filterMetricId" placeholder="筛选指标" clearable @change="fetchRecords" style="width: 180px; margin-right: 10px;">
           <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
         </el-select>
+        <el-popconfirm v-if="filterDate" :title="`确定要删除 ${filterDate} 的所有体检记录吗？`" @confirm="handleDeleteByDate">
+          <template #reference>
+            <el-button type="danger" plain>删除该日记录</el-button>
+          </template>
+        </el-popconfirm>
       </div>
       <el-button type="primary" @click="$router.push('/input')">
         <el-icon style="margin-right: 5px;"><Plus /></el-icon> 新增记录
@@ -180,6 +185,21 @@ const handleDeleteRecord = async (row) => {
     fetchRecords()
   } catch (e) {
     ElMessage.error('删除失败')
+  }
+}
+
+const handleDeleteByDate = async () => {
+  if (!filterDate.value) return
+  try {
+    let url = `/metrics/date/${filterDate.value}`
+    if (filterPersonId.value) {
+      url += `?person_id=${filterPersonId.value}`
+    }
+    const res = await api.delete(url)
+    ElMessage.success(`成功删除 ${res.data.deleted_count} 条记录`)
+    fetchRecords()
+  } catch (e) {
+    ElMessage.error('删除该日记录失败')
   }
 }
 

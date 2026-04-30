@@ -81,6 +81,7 @@ class BatchMetricCreate(BaseModel):
 
 class SmartParseRequest(BaseModel):
     text: str = Field(..., description="待解析的自然语言文本")
+    images: Optional[List[str]] = Field(None, description="图片的base64编码列表")
 
 class HealthAdviceRequest(BaseModel):
     person_id: int = Field(..., description="需要生成健康建议的人员ID")

@@ -11,24 +11,104 @@
         <el-date-picker v-model="batchForm.recordDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD"></el-date-picker>
       </el-form-item>
 
-      <el-divider>快速导入 (支持JSON与智能文本解析)</el-divider>
-      <el-form-item label="原始数据">
-        <el-input 
-          v-model="jsonInput" 
-          type="textarea" 
-          :rows="4" 
-          placeholder='支持两种方式：
+      <el-divider>快速导入 (支持文件、JSON与智能文本)</el-divider>
+      <el-form-item label="方式选择">
+        <el-radio-group v-model="importType">
+          <el-radio-button label="text">文本解析</el-radio-button>
+          <el-radio-button label="smart_file">AI文件解析</el-radio-button>
+          <el-radio-button label="file">标准CSV导入</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <div v-if="importType === 'text'">
+        <el-form-item label="原始数据">
+          <el-input 
+            v-model="jsonInput" 
+            type="textarea" 
+            :rows="4" 
+            placeholder='支持两种方式：
 1. 直接粘贴标准JSON，例如：{"体重": "70.8", "收缩压": 120}。
 2. 粘贴自然语言（智能解析），例如："我今天早上称了一下体重，大概是 75.2kg，然后量了血压是 125 毫米汞柱"。'>
-        </el-input>
-        <div style="margin-top: 10px; text-align: right; width: 100%;">
-          <el-button type="info" plain size="small" @click="parseJsonInput">标准JSON解析</el-button>
-          <el-button type="primary" size="small" @click="smartParseInput" :loading="parsingText">
-            <el-icon style="margin-right: 5px;"><MagicStick /></el-icon>
-            AI 智能解析
-          </el-button>
-        </div>
-      </el-form-item>
+          </el-input>
+          <div style="margin-top: 10px; text-align: right; width: 100%;">
+            <el-button type="info" plain size="small" @click="parseJsonInput">标准JSON解析</el-button>
+            <el-button type="primary" size="small" @click="smartParseInput" :loading="parsingText">
+              <el-icon style="margin-right: 5px;"><MagicStick /></el-icon>
+              AI 智能解析
+            </el-button>
+          </div>
+        </el-form-item>
+      </div>
+
+      <div v-if="importType === 'smart_file'">
+        <el-form-item label="智能解析文件">
+          <el-upload
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :show-file-list="true"
+            :limit="10"
+            multiple
+            accept=".pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.gif"
+            :on-change="handleSmartFileChange"
+            :on-exceed="handleSmartExceed"
+            :file-list="smartFileList"
+            :on-remove="handleSmartFileRemove"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              将文件或图片拖到此处，或 <em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持多图 (.jpg, .png)、体检报告 PDF，或纯文本文件。大模型将智能提取各项指标。
+              </div>
+            </template>
+          </el-upload>
+          <div style="margin-top: 10px; width: 100%;">
+            <el-button type="primary" @click="submitSmartFileUpload" :loading="parsingText" :disabled="smartFileList.length === 0">
+              <el-icon style="margin-right: 5px;"><MagicStick /></el-icon>
+              开始 AI 智能解析
+            </el-button>
+          </div>
+        </el-form-item>
+      </div>
+
+      <div v-if="importType === 'file'">
+        <el-form-item label="CSV文件">
+          <el-upload
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :show-file-list="true"
+            :limit="1"
+            accept=".csv"
+            :on-change="handleFileChange"
+            :on-exceed="handleExceed"
+            :file-list="fileList"
+            :on-remove="handleFileRemove"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或 <em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 CSV 文件，请确保包含表头: 指标名称,数值,单位,参考下限,参考上限,备注
+                <el-button link type="primary" style="margin-left: 10px;" @click="downloadTemplate">下载模板</el-button>
+              </div>
+            </template>
+          </el-upload>
+          <div style="margin-top: 10px; width: 100%;">
+            <el-button type="primary" @click="submitFileUpload" :loading="uploading" :disabled="fileList.length === 0">
+              <el-icon style="margin-right: 5px;"><Upload /></el-icon>
+              确认上传并录入
+            </el-button>
+          </div>
+        </el-form-item>
+      </div>
       
       <el-divider>
         指标列表 
@@ -95,7 +175,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { MagicStick, Plus, Delete } from '@element-plus/icons-vue'
+import { MagicStick, Plus, Delete, UploadFilled, Upload } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const router = useRouter()
@@ -103,7 +183,11 @@ const persons = ref([])
 const definitions = ref([])
 const submitting = ref(false)
 const parsingText = ref(false)
+const uploading = ref(false)
 const jsonInput = ref('')
+const importType = ref('text')
+const fileList = ref([])
+const smartFileList = ref([])
 
 const batchForm = reactive({
   person_id: '',
@@ -248,6 +332,45 @@ const smartParseInput = async () => {
   }
 }
 
+const handleSmartFileChange = (file, fileList) => {
+  smartFileList.value = fileList
+}
+
+const handleSmartExceed = (files) => {
+  ElMessage.warning('最多只能上传 10 个文件或图片')
+}
+
+const handleSmartFileRemove = (file, fileList) => {
+  smartFileList.value = fileList
+}
+
+const submitSmartFileUpload = async () => {
+  if (smartFileList.value.length === 0) return ElMessage.warning('请选择文件或图片')
+
+  const formData = new FormData()
+  smartFileList.value.forEach(f => {
+    const rawFile = f.raw || f
+    formData.append('files', rawFile)
+  })
+
+  parsingText.value = true
+  try {
+    const res = await api.post('/smart/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    appendParsedDataToForm(res.data)
+    ElMessage.success('文件 AI 解析成功，请检查下方指标列表')
+    smartFileList.value = []
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || '智能解析文件失败'
+    ElMessage.error(errorMsg)
+  } finally {
+    parsingText.value = false
+  }
+}
+
 const submitBatch = async () => {
   if (!batchForm.person_id) return ElMessage.warning('请选择人员')
   if (!batchForm.recordDate) return ElMessage.warning('请选择体检日期')
@@ -283,6 +406,59 @@ const submitBatch = async () => {
     ElMessage.error('保存失败')
   } finally {
     submitting.value = false
+  }
+}
+
+const handleFileChange = (file) => {
+  fileList.value = [file]
+}
+
+const handleExceed = (files) => {
+  fileList.value = [files[0]]
+}
+
+const handleFileRemove = () => {
+  fileList.value = []
+}
+
+const downloadTemplate = () => {
+  const template = '指标名称,数值,单位,参考下限,参考上限,备注\n体重,70.5,kg,,,\n收缩压,120,mmHg,90,140,正常\n舒张压,80,mmHg,60,90,正常'
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), template], { type: 'text/csv;charset=utf-8' })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = '体检指标导入模板.csv'
+  a.click()
+  window.URL.revokeObjectURL(url)
+}
+
+const submitFileUpload = async () => {
+  if (!batchForm.person_id) return ElMessage.warning('请选择人员')
+  if (!batchForm.recordDate) return ElMessage.warning('请选择体检日期')
+  if (fileList.value.length === 0) return ElMessage.warning('请选择文件')
+
+  const file = fileList.value[0].raw || fileList.value[0]
+  if (!file) return ElMessage.warning('文件无效')
+
+  const formData = new FormData()
+  formData.append('person_id', batchForm.person_id)
+  formData.append('record_date', batchForm.recordDate)
+  formData.append('file', file)
+
+  uploading.value = true
+  try {
+    const res = await api.post('/metrics/batch/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    ElMessage.success(`成功从文件导入 ${res.data.length} 条记录`)
+    router.push('/')
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || '文件上传解析失败'
+    ElMessage.error(errorMsg)
+  } finally {
+    uploading.value = false
   }
 }
 
