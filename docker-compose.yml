@@ -4,7 +4,7 @@ services:
       context: ./backend
     image: zhou7419/health-backend:latest
     environment:
-      DATABASE_URL: "sqlite:///app/database/app.db"
+      DATABASE_URL: "sqlite:////app/database/app.db"
       DEEPSEEK_BASE_URL: "https://api.deepseek.com"
       DEEPSEEK_API_KEY: ""
       SECRET_KEY: ""
