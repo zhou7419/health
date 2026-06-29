@@ -21,6 +21,18 @@
       </el-table-column>
     </el-table>
 
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="fetchPersons"
+        @size-change="handleSizeChange"
+      />
+    </div>
+
     <!-- 新增人员弹窗 -->
     <el-dialog v-model="personDialogVisible" title="新增人员" width="400px">
       <el-form :model="personForm" label-width="100px">
@@ -51,13 +63,24 @@ import api from '../utils/api'
 const persons = ref([])
 const personDialogVisible = ref(false)
 const submitting = ref(false)
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
 const personForm = reactive({ name: '', gender: '' })
 
 const fetchPersons = async () => {
   try {
-    const res = await api.get('/persons/?limit=100')
-    persons.value = res.data
+    const res = await api.get('/persons/', {
+      params: { page: currentPage.value, page_size: pageSize.value }
+    })
+    persons.value = res.data.items
+    total.value = res.data.total
   } catch (error) {}
+}
+
+const handleSizeChange = () => {
+  currentPage.value = 1
+  fetchPersons()
 }
 
 const openPersonDialog = () => {
@@ -99,4 +122,5 @@ onMounted(() => {
 <style scoped>
 .page-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); min-height: calc(100vh - 140px); }
 .toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 </style>

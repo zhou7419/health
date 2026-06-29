@@ -49,3 +49,11 @@ docker-compose up -d --build
 
 3. **访问**：
 通过宿主机的 `80` 端口访问系统（Nginx 会自动将 `/api` 的请求反向代理到后端的 8000 端口）。
+
+4. **更新代码 (Git Pull 后如何更新项目)**：
+如果您在 1Panel 上通过 Git Pull 更新了代码，由于代码可能包含依赖变更或前端打包变更，您需要重新构建镜像并重启容器。请在终端执行以下命令：
+```bash
+docker-compose down
+docker-compose up -d --build
+```
+> **注意**：由于挂载了 `./database` 目录，您的所有体检数据都会被安全保留，无需担心丢失。

@@ -19,6 +19,17 @@ web/dist/
 web/dist-ssr/
 web/*.local
 
+# Mobile app build (HBuilder/uni-app)
+m/android-build/
+m/apk-build/
+m/apk-repack/
+m/dist/
+m/unpackage/
+m/node_modules/
+m/*.apk
+m/*.apk.idsig
+m/.hbuilderx/
+
 # Editor
 .trae/
 .vscode/

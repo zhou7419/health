@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import asc
+from sqlalchemy import asc, func
 from typing import List, Optional
 from datetime import date
 from app.models.metric import MetricRecord, MetricDefinition, Person
 from app.schemas.metric import (
-    MetricRecordCreate, 
-    BatchMetricCreate, 
+    MetricRecordCreate,
+    BatchMetricCreate,
     MetricRecordUpdate,
     MetricDefinitionCreate,
     MetricDefinitionUpdate,
@@ -15,6 +15,9 @@ from app.schemas.metric import (
 # --- Persons ---
 def get_persons(db: Session, skip: int = 0, limit: int = 100) -> List[Person]:
     return db.query(Person).offset(skip).limit(limit).all()
+
+def count_persons(db: Session) -> int:
+    return db.query(func.count(Person.id)).scalar()
 
 def create_person(db: Session, person_in: PersonCreate) -> Person:
     db_person = Person(name=person_in.name, gender=person_in.gender)
@@ -33,8 +36,17 @@ def delete_person(db: Session, person_id: int) -> bool:
     return True
 
 # --- Metric Definitions ---
-def get_definitions(db: Session, skip: int = 0, limit: int = 100) -> List[MetricDefinition]:
-    return db.query(MetricDefinition).offset(skip).limit(limit).all()
+def get_definitions(db: Session, skip: int = 0, limit: int = 100, name: Optional[str] = None) -> List[MetricDefinition]:
+    query = db.query(MetricDefinition)
+    if name:
+        query = query.filter(MetricDefinition.name.like(f"%{name}%"))
+    return query.order_by(MetricDefinition.id.asc()).offset(skip).limit(limit).all()
+
+def count_definitions(db: Session, name: Optional[str] = None) -> int:
+    query = db.query(func.count(MetricDefinition.id))
+    if name:
+        query = query.filter(MetricDefinition.name.like(f"%{name}%"))
+    return query.scalar()
 
 def create_definition(db: Session, def_in: MetricDefinitionCreate) -> MetricDefinition:
     db_def = MetricDefinition(**def_in.model_dump())
@@ -115,6 +127,18 @@ def get_metrics(
     if record_date:
         query = query.filter(MetricRecord.record_date == record_date)
     return query.order_by(MetricRecord.record_date.desc()).offset(skip).limit(limit).all()
+
+def count_metrics(
+    db: Session, metric_id: Optional[int] = None, record_date: Optional[date] = None, person_id: Optional[int] = None
+) -> int:
+    query = db.query(func.count(MetricRecord.id))
+    if person_id is not None:
+        query = query.filter(MetricRecord.person_id == person_id)
+    if metric_id is not None:
+        query = query.filter(MetricRecord.metric_id == metric_id)
+    if record_date:
+        query = query.filter(MetricRecord.record_date == record_date)
+    return query.scalar()
 
 def get_metric_history(db: Session, metric_id: int, person_id: int) -> List[MetricRecord]:
     return db.query(MetricRecord)\

@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.api.deps import get_current_user, get_db
-from app.schemas.metric import PersonResponse, PersonCreate
+from app.schemas.metric import PersonResponse, PersonCreate, PersonPageResponse
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
 
-@router.get("/", response_model=List[PersonResponse])
-def read_persons(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """获取所有人员列表"""
-    return crud_metric.get_persons(db, skip=skip, limit=limit)
+@router.get("/", response_model=PersonPageResponse)
+def read_persons(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页条数"),
+    db: Session = Depends(get_db)
+):
+    """获取所有人员列表，支持分页"""
+    skip = (page - 1) * page_size
+    items = crud_metric.get_persons(db, skip=skip, limit=page_size)
+    total = crud_metric.count_persons(db)
+    return PersonPageResponse(items=items, total=total, page=page, page_size=page_size)
 
 @router.post("/", response_model=PersonResponse)
 def create_person(person_in: PersonCreate, db: Session = Depends(get_db)):

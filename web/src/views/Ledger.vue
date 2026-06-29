@@ -2,13 +2,14 @@
   <div class="page-container">
     <div class="toolbar">
       <div class="filters">
-        <el-select v-model="filterPersonId" placeholder="筛选人员" clearable @change="fetchRecords" style="width: 150px; margin-right: 10px;">
+        <el-select v-model="filterPersonId" placeholder="筛选人员" clearable filterable style="width: 150px; margin-right: 10px;">
           <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
         </el-select>
-        <el-date-picker v-model="filterDate" type="date" placeholder="选择体检日期" value-format="YYYY-MM-DD" style="margin-right: 10px;" clearable @change="fetchRecords"></el-date-picker>
-        <el-select v-model="filterMetricId" placeholder="筛选指标" clearable @change="fetchRecords" style="width: 180px; margin-right: 10px;">
+        <el-date-picker v-model="filterDate" type="date" placeholder="选择体检日期" value-format="YYYY-MM-DD" style="margin-right: 10px;" clearable></el-date-picker>
+        <el-select v-model="filterMetricId" placeholder="筛选指标" clearable filterable style="width: 180px; margin-right: 10px;">
           <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
         </el-select>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-popconfirm v-if="filterDate" :title="`确定要删除 ${filterDate} 的所有体检记录吗？`" @confirm="handleDeleteByDate">
           <template #reference>
             <el-button type="danger" plain>删除该日记录</el-button>
@@ -56,6 +57,18 @@
       </el-table-column>
     </el-table>
 
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="fetchRecords"
+        @size-change="handleSizeChange"
+      />
+    </div>
+
     <!-- 编辑记录弹窗 -->
     <el-dialog v-model="editRecordDialogVisible" title="编辑体检记录" width="400px">
       <el-form v-if="editRecordForm" :model="editRecordForm" label-width="100px">
@@ -94,6 +107,9 @@ const persons = ref([])
 const definitions = ref([])
 const loading = ref(false)
 const submitting = ref(false)
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
 const filterDate = ref('')
 const filterPersonId = ref('')
 const filterMetricId = ref('')
@@ -104,13 +120,17 @@ const editRecordForm = ref(null)
 const fetchRecords = async () => {
   loading.value = true
   try {
-    let url = '/metrics/?limit=1000'
-    if (filterDate.value) url += `&record_date=${filterDate.value}`
-    if (filterMetricId.value) url += `&metric_id=${filterMetricId.value}`
-    if (filterPersonId.value) url += `&person_id=${filterPersonId.value}`
-    
-    const res = await api.get(url)
-    records.value = res.data
+    const params = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+    }
+    if (filterDate.value) params.record_date = filterDate.value
+    if (filterMetricId.value) params.metric_id = filterMetricId.value
+    if (filterPersonId.value) params.person_id = filterPersonId.value
+
+    const res = await api.get('/metrics/', { params })
+    records.value = res.data.items
+    total.value = res.data.total
   } catch (error) {
     ElMessage.error('获取台账数据失败')
   } finally {
@@ -118,17 +138,27 @@ const fetchRecords = async () => {
   }
 }
 
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchRecords()
+}
+
+const handleSizeChange = () => {
+  currentPage.value = 1
+  fetchRecords()
+}
+
 const fetchPersons = async () => {
   try {
-    const res = await api.get('/persons/?limit=100')
-    persons.value = res.data
+    const res = await api.get('/persons/', { params: { page: 1, page_size: 100 } })
+    persons.value = res.data.items
   } catch (error) {}
 }
 
 const fetchDefinitions = async () => {
   try {
-    const res = await api.get('/definitions/?limit=1000')
-    definitions.value = res.data
+    const res = await api.get('/definitions/', { params: { page: 1, page_size: 1000 } })
+    definitions.value = res.data.items
   } catch (error) {}
 }
 
@@ -215,4 +245,5 @@ onMounted(() => {
 .toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
 .abnormal-value { color: #F56C6C; font-weight: bold; }
 .normal-value { color: #67C23A; font-weight: bold; }
+.pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 </style>

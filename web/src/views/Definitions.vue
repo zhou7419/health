@@ -2,7 +2,18 @@
   <div class="page-container">
     <div class="toolbar">
       <h3>体检指标字典库</h3>
-      <el-button type="primary" @click="openDefDialog()">新增指标定义</el-button>
+      <div class="toolbar-right">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索指标名称"
+          clearable
+          style="width: 250px; margin-right: 12px;"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        />
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
+        <el-button type="primary" @click="openDefDialog()">新增指标定义</el-button>
+      </div>
     </div>
 
     <el-table :data="definitions" border style="width: 100%" v-loading="loading">
@@ -26,6 +37,18 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="fetchDefinitions"
+        @size-change="handleSizeChange"
+      />
+    </div>
 
     <!-- 指标定义弹窗 -->
     <el-dialog v-model="defDialogVisible" :title="defForm.id ? '编辑指标' : '新增指标'" width="400px">
@@ -60,6 +83,10 @@ const definitions = ref([])
 const loading = ref(false)
 const defDialogVisible = ref(false)
 const submitting = ref(false)
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const searchKeyword = ref('')
 const defForm = reactive({
   id: null,
   name: '',
@@ -71,13 +98,30 @@ const defForm = reactive({
 const fetchDefinitions = async () => {
   loading.value = true
   try {
-    const res = await api.get('/definitions/?limit=1000')
-    definitions.value = res.data
+    const res = await api.get('/definitions/', {
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value,
+        name: searchKeyword.value || undefined
+      }
+    })
+    definitions.value = res.data.items
+    total.value = res.data.total
   } catch (error) {
     ElMessage.error('获取指标列表失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchDefinitions()
+}
+
+const handleSizeChange = () => {
+  currentPage.value = 1
+  fetchDefinitions()
 }
 
 const openDefDialog = (row = null) => {
@@ -143,4 +187,6 @@ onMounted(() => {
 <style scoped>
 .page-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); min-height: calc(100vh - 140px); }
 .toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.toolbar-right { display: flex; align-items: center; }
+.pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 </style>

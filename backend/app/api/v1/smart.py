@@ -214,7 +214,7 @@ async def generate_health_advice(request: HealthAdviceRequest, db: Session = Dep
 3. 给出具体、可操作的改善建议（包括饮食、运动、作息或复查建议）。
 4. 语言要通俗易懂，态度要温暖关怀。
 
-请使用 Markdown 格式输出排版精美的报告。不要包含无关的开头或结尾寒暄，直接输出报告内容。
+请使用 HTML 格式输出，用 h3/h4 做标题，用 ul/li 做列表，用 p 做段落。不要包含 <!DOCTYPE> <html> <body> 等标签，直接输出 body 内容。
 """
 
     payload = {

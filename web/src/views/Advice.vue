@@ -38,8 +38,8 @@ const generatingAdvice = ref(false)
 
 const fetchPersons = async () => {
   try {
-    const res = await api.get('/persons/?limit=100')
-    persons.value = res.data
+    const res = await api.get('/persons/', { params: { page: 1, page_size: 100 } })
+    persons.value = res.data.items
   } catch (error) {}
 }
 

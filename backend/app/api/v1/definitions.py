@@ -1,19 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_current_user, get_db
-from app.schemas.metric import MetricDefinitionResponse, MetricDefinitionCreate, MetricDefinitionUpdate
+from app.schemas.metric import MetricDefinitionResponse, MetricDefinitionCreate, MetricDefinitionUpdate, MetricDefinitionPageResponse
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
 
-@router.get("/", response_model=List[MetricDefinitionResponse])
-def read_definitions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """获取所有指标定义"""
-    return crud_metric.get_definitions(db, skip=skip, limit=limit)
+@router.get("/", response_model=MetricDefinitionPageResponse)
+def read_definitions(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页条数"),
+    name: Optional[str] = Query(None, description="指标名称模糊搜索"),
+    db: Session = Depends(get_db)
+):
+    """获取所有指标定义，支持名称模糊搜索和分页"""
+    skip = (page - 1) * page_size
+    items = crud_metric.get_definitions(db, skip=skip, limit=page_size, name=name)
+    total = crud_metric.count_definitions(db, name=name)
+    return MetricDefinitionPageResponse(items=items, total=total, page=page, page_size=page_size)
 
 @router.post("/", response_model=MetricDefinitionResponse)
 def create_definition(def_in: MetricDefinitionCreate, db: Session = Depends(get_db)):

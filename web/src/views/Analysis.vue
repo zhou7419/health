@@ -1,12 +1,13 @@
 <template>
   <div class="page-container">
-    <div class="toolbar" style="justify-content: flex-start; gap: 20px;">
-      <el-select v-model="analysisPersonId" placeholder="选择人员" @change="loadAnalysisChart" style="width: 200px;">
+    <div class="toolbar" style="justify-content: flex-start; gap: 12px;">
+      <el-select v-model="analysisPersonId" placeholder="选择人员" style="width: 200px;">
         <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
       </el-select>
-      <el-select v-model="analysisMetricId" placeholder="选择指标" @change="loadAnalysisChart" style="width: 250px;">
+      <el-select v-model="analysisMetricId" placeholder="选择指标" style="width: 250px;">
         <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
       </el-select>
+      <el-button type="primary" @click="loadAnalysisChart">查询分析</el-button>
     </div>
 
     <div v-show="!analysisMetricId || !analysisPersonId" style="text-align: center; color: #909399; margin-top: 100px;">
@@ -31,15 +32,15 @@ let chartInstance = null
 
 const fetchPersons = async () => {
   try {
-    const res = await api.get('/persons/?limit=100')
-    persons.value = res.data
+    const res = await api.get('/persons/', { params: { page: 1, page_size: 100 } })
+    persons.value = res.data.items
   } catch (error) {}
 }
 
 const fetchDefinitions = async () => {
   try {
-    const res = await api.get('/definitions/?limit=1000')
-    definitions.value = res.data
+    const res = await api.get('/definitions/', { params: { page: 1, page_size: 1000 } })
+    definitions.value = res.data.items
   } catch (error) {}
 }
 

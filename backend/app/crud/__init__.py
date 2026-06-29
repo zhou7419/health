@@ -1,11 +1,18 @@
 from .metric import (
     get_definitions,
+    count_definitions,
     create_definition,
     update_definition,
     delete_definition,
+    get_persons,
+    count_persons,
+    create_person,
+    delete_person,
     create_metrics_batch,
     get_metrics,
+    count_metrics,
     get_metric_history,
     update_metric,
-    delete_metric
+    delete_metric,
+    delete_metrics_by_date,
 )

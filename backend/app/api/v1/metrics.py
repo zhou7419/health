@@ -6,7 +6,7 @@ import csv
 import io
 
 from app.api.deps import get_current_user, get_db
-from app.schemas.metric import MetricRecordResponse, BatchMetricCreate, MetricRecordUpdate, MetricItemCreate
+from app.schemas.metric import MetricRecordResponse, MetricRecordPageResponse, BatchMetricCreate, MetricRecordUpdate, MetricItemCreate
 from app.crud import metric as crud_metric
 from app.utils.logger import get_logger
 
@@ -89,19 +89,22 @@ async def upload_metrics_batch(
 
 
 
-@router.get("/", response_model=List[MetricRecordResponse])
+@router.get("/", response_model=MetricRecordPageResponse)
 def read_metrics(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页条数"),
     person_id: Optional[int] = None,
     metric_id: Optional[int] = None,
     record_date: Optional[date] = None,
     db: Session = Depends(get_db)
 ):
     """
-    获取所有指标记录，支持按人员ID、指标ID或日期过滤
+    获取体检指标记录，支持分页和按人员ID、指标ID或日期过滤
     """
-    return crud_metric.get_metrics(db, skip=skip, limit=limit, person_id=person_id, metric_id=metric_id, record_date=record_date)
+    skip = (page - 1) * page_size
+    items = crud_metric.get_metrics(db, skip=skip, limit=page_size, person_id=person_id, metric_id=metric_id, record_date=record_date)
+    total = crud_metric.count_metrics(db, person_id=person_id, metric_id=metric_id, record_date=record_date)
+    return MetricRecordPageResponse(items=items, total=total, page=page, page_size=page_size)
 
 @router.get("/{metric_id}/history", response_model=List[MetricRecordResponse])
 def get_metric_history(

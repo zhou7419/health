@@ -1,0 +1,60 @@
+{
+    "name" : "体检指标台账",
+    "appid" : "__UNI__C305BB0",
+    "description" : "个人体检指标管理台账移动端",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0,
+            "backgroundColor" : "#409EFF"
+        },
+        "safearea" : {
+            "bottom" : {
+                "offset" : "none"
+            }
+        },
+        "distribute" : {
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
+                ]
+            },
+            "ios" : {
+                "dSYMs" : false
+            },
+            "icons" : {
+                "android" : {
+                    "hdpi" : "src/static/icons/icon-hdpi.png",
+                    "xhdpi" : "src/static/icons/icon-xhdpi.png",
+                    "xxhdpi" : "src/static/icons/icon-xxhdpi.png",
+                    "xxxhdpi" : "src/static/icons/icon-xxxhdpi.png"
+                }
+            }
+        }
+    },
+    "h5" : {
+        "routerMode" : "hash",
+        "routerBase" : "/"
+    },
+    "mp-weixin" : {
+        "appid" : "",
+        "setting" : {
+            "urlCheck" : false
+        },
+        "usingComponents" : true
+    },
+    "uniStatistics" : {
+        "enable" : false
+    },
+    "vueVersion" : "3"
+}

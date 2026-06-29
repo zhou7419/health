@@ -1,0 +1,92 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+    }
+  },
+  "pages": [
+    {
+      "path": "pages/ledger/ledger",
+      "style": {
+        "navigationBarTitleText": "数据台账",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/input/input",
+      "style": {
+        "navigationBarTitleText": "批量录入"
+      }
+    },
+    {
+      "path": "pages/mine/mine",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/persons/persons",
+      "style": {
+        "navigationBarTitleText": "人员管理"
+      }
+    },
+    {
+      "path": "pages/definitions/definitions",
+      "style": {
+        "navigationBarTitleText": "指标字典"
+      }
+    },
+    {
+      "path": "pages/analysis/analysis",
+      "style": {
+        "navigationBarTitleText": "趋势分析"
+      }
+    },
+    {
+      "path": "pages/advice/advice",
+      "style": {
+        "navigationBarTitleText": "健康建议"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "体检指标台账",
+    "navigationBarBackgroundColor": "#409EFF",
+    "backgroundColor": "#f0f2f5"
+  },
+  "tabBar": {
+    "color": "#909399",
+    "selectedColor": "#409EFF",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/ledger/ledger",
+        "iconPath": "static/icons/ledger.png",
+        "selectedIconPath": "static/icons/ledger-active.png",
+        "text": "台账"
+      },
+      {
+        "pagePath": "pages/input/input",
+        "iconPath": "static/icons/input.png",
+        "selectedIconPath": "static/icons/input-active.png",
+        "text": "录入"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "iconPath": "static/icons/mine.png",
+        "selectedIconPath": "static/icons/mine-active.png",
+        "text": "我的"
+      }
+    ]
+  }
+}

@@ -17,6 +17,12 @@ class PersonResponse(PersonBase):
     class Config:
         from_attributes = True
 
+class PersonPageResponse(BaseModel):
+    items: List[PersonResponse]
+    total: int
+    page: int
+    page_size: int
+
 class MetricDefinitionBase(BaseModel):
     name: str = Field(..., description="指标名称，如'体重', '收缩压'")
     unit: Optional[str] = Field(None, description="单位，如'kg', 'mmHg'")
@@ -39,6 +45,12 @@ class MetricDefinitionResponse(MetricDefinitionBase):
 
     class Config:
         from_attributes = True
+
+class MetricDefinitionPageResponse(BaseModel):
+    items: List[MetricDefinitionResponse]
+    total: int
+    page: int
+    page_size: int
 
 class MetricItemCreate(BaseModel):
     metric_id: Optional[int] = Field(None, description="已存在的指标ID")
@@ -73,6 +85,12 @@ class MetricRecordResponse(MetricRecordBase):
 
     class Config:
         from_attributes = True
+
+class MetricRecordPageResponse(BaseModel):
+    items: List[MetricRecordResponse]
+    total: int
+    page: int
+    page_size: int
 
 class BatchMetricCreate(BaseModel):
     person_id: int = Field(..., description="人员ID")
