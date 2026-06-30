@@ -151,7 +151,20 @@
         </div>
         
         <el-input v-model="metric.notes" placeholder="备注" style="flex: 1; min-width: 150px;"></el-input>
-        
+
+        <div v-if="getMetricWarning(metric).length > 0" style="width: 100%; margin-top: 4px;">
+          <el-tag
+            v-for="(w, wi) in getMetricWarning(metric)" :key="wi"
+            :type="w.type"
+            size="small"
+            effect="plain"
+            style="margin-right: 6px;"
+          >
+            <el-icon style="margin-right: 2px;"><WarningFilled /></el-icon>
+            {{ w.text }}
+          </el-tag>
+        </div>
+
         <el-button type="danger" circle @click="removeBatchItem(index)" :disabled="batchForm.metrics.length === 1">
           <el-icon><Delete /></el-icon>
         </el-button>
@@ -200,7 +213,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { MagicStick, Plus, Delete, UploadFilled, Upload } from '@element-plus/icons-vue'
+import { MagicStick, Plus, Delete, UploadFilled, Upload, WarningFilled } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const router = useRouter()
@@ -268,6 +281,43 @@ const getMetricUnit = (id) => {
   if (id === 'custom' || !id) return ''
   const def = definitions.value.find(d => d.id === id)
   return def ? def.unit : ''
+}
+
+const getMetricDef = (id) => {
+  if (!id || id === 'custom') return null
+  return definitions.value.find(d => d.id === id) || null
+}
+
+const getMetricWarning = (metric) => {
+  const warnings = []
+  if (metric.value === undefined || metric.value === null) return warnings
+
+  // 值范围检查
+  const def = metric.metric_id === 'custom' ? null : getMetricDef(metric.metric_id)
+  if (def) {
+    if (def.expected_min != null && metric.value < def.expected_min) {
+      warnings.push({ type: 'danger', text: `低于参考下限 ${def.expected_min}` })
+    }
+    if (def.expected_max != null && metric.value > def.expected_max) {
+      warnings.push({ type: 'danger', text: `高于参考上限 ${def.expected_max}` })
+    }
+  } else if (metric.expected_min != null && metric.value < metric.expected_min) {
+    warnings.push({ type: 'warning', text: `低于自定义下限 ${metric.expected_min}` })
+  } else if (metric.expected_max != null && metric.value > metric.expected_max) {
+    warnings.push({ type: 'warning', text: `高于自定义上限 ${metric.expected_max}` })
+  }
+
+  // 重复检查（同人同日同指标）
+  if (metric.metric_id && metric.metric_id !== 'custom') {
+    const dup = batchForm.metrics.find((m, i) =>
+      m !== metric && m.metric_id === metric.metric_id && m.metric_id !== '' && m.metric_id !== 'custom'
+    )
+    if (dup) {
+      warnings.push({ type: 'warning', text: '该指标已录入，请检查是否重复' })
+    }
+  }
+
+  return warnings
 }
 
 const getExpectedRangeStr = (id) => {

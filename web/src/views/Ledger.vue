@@ -5,7 +5,7 @@
         <el-select v-model="filterPersonId" placeholder="筛选人员" clearable filterable style="width: 150px; margin-right: 10px;">
           <el-option v-for="p in persons" :key="p.id" :label="p.name" :value="p.id"></el-option>
         </el-select>
-        <el-date-picker v-model="filterDate" type="date" placeholder="选择体检日期" value-format="YYYY-MM-DD" style="margin-right: 10px;" clearable></el-date-picker>
+        <el-date-picker v-model="filterDate" type="date" placeholder="选择体检日期" value-format="YYYY-MM-DD" style="margin-right: 10px;" clearable @change="saveFilterState"></el-date-picker>
         <el-select v-model="filterMetricId" placeholder="筛选指标" clearable filterable style="width: 180px; margin-right: 10px;">
           <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
         </el-select>
@@ -26,47 +26,71 @@
           </template>
         </el-popconfirm>
       </div>
-      <el-button type="primary" @click="$router.push('/input')">
-        <el-icon style="margin-right: 5px;"><Plus /></el-icon> 新增记录
-      </el-button>
+      <div style="display: flex; gap: 8px;">
+        <el-dropdown trigger="click" @command="toggleColumn">
+          <el-button>
+            <el-icon><Setting /></el-icon> 列设置
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="col in allColumns" :key="col.key" :command="col.key">
+                <el-checkbox :model-value="visibleColumns.includes(col.key)" style="margin-right: 4px;" />
+                {{ col.label }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button type="primary" @click="$router.push('/input')">
+          <el-icon style="margin-right: 5px;"><Plus /></el-icon> 新增记录
+        </el-button>
+      </div>
     </div>
 
-    <el-table :data="records" border style="width: 100%" v-loading="loading" @selection-change="onSelectionChange">
-      <el-table-column type="selection" width="45" />
-      <el-table-column prop="record_date" label="体检日期" width="120" sortable></el-table-column>
-      <el-table-column label="人员" width="100">
-        <template #default="scope">{{ scope.row.person.name }}</template>
-      </el-table-column>
-      <el-table-column label="指标名称" width="150">
-        <template #default="scope">{{ scope.row.metric.name }}</template>
-      </el-table-column>
-      <el-table-column label="数值" width="150">
-        <template #default="scope">
-          <span :class="getValueClass(scope.row.value, scope.row.metric)">
-            {{ scope.row.value }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期望区间" width="150">
-        <template #default="scope">
-          {{ formatExpectedRange(scope.row.metric) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="单位" width="100">
-        <template #default="scope">{{ scope.row.metric.unit }}</template>
-      </el-table-column>
-      <el-table-column prop="notes" label="备注"></el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
-        <template #default="scope">
-          <el-button size="small" type="primary" link @click="handleEditRecord(scope.row)">编辑</el-button>
-          <el-popconfirm title="确定要删除这条记录吗？" @confirm="handleDeleteRecord(scope.row)">
-            <template #reference>
-              <el-button size="small" type="danger" link>删除</el-button>
+    <!-- 骨架屏加载 -->
+    <el-skeleton :rows="8" animated :loading="loading" style="padding: 12px 0;">
+      <template #default>
+        <el-table :data="records" border style="width: 100%" @selection-change="onSelectionChange">
+          <el-table-column type="selection" width="45" />
+          <el-table-column v-if="visibleColumns.includes('record_date')" prop="record_date" label="体检日期" width="120" sortable></el-table-column>
+          <el-table-column v-if="visibleColumns.includes('person')" label="人员" width="100">
+            <template #default="scope">{{ scope.row.person.name }}</template>
+          </el-table-column>
+          <el-table-column v-if="visibleColumns.includes('metric')" label="指标名称" width="150">
+            <template #default="scope">{{ scope.row.metric.name }}</template>
+          </el-table-column>
+          <el-table-column v-if="visibleColumns.includes('value')" label="数值" width="150">
+            <template #default="scope">
+              <el-tag v-if="isAbnormal(scope.row.value, scope.row.metric)" type="danger" effect="dark" size="small" style="font-weight: bold;">
+                {{ scope.row.value }}
+              </el-tag>
+              <span v-else style="color: #67C23A; font-weight: bold;">{{ scope.row.value }}</span>
             </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+          </el-table-column>
+          <el-table-column v-if="visibleColumns.includes('expected')" label="期望区间" width="150">
+            <template #default="scope">
+              {{ formatExpectedRange(scope.row.metric) }}
+              <el-icon v-if="isAbnormal(scope.row.value, scope.row.metric)" style="color: #F56C6C; vertical-align: middle; margin-left: 4px;">
+                <WarningFilled />
+              </el-icon>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="visibleColumns.includes('unit')" label="单位" width="100">
+            <template #default="scope">{{ scope.row.metric.unit }}</template>
+          </el-table-column>
+          <el-table-column v-if="visibleColumns.includes('notes')" prop="notes" label="备注"></el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="scope">
+              <el-button size="small" type="primary" link @click="handleEditRecord(scope.row)">编辑</el-button>
+              <el-popconfirm title="确定要删除这条记录吗？" @confirm="handleDeleteRecord(scope.row)">
+                <template #reference>
+                  <el-button size="small" type="danger" link>删除</el-button>
+                </template>
+              </el-popconfirm>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+    </el-skeleton>
 
     <div class="pagination-wrapper">
       <el-pagination
@@ -110,7 +134,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Setting, WarningFilled } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const records = ref([])
@@ -128,6 +152,67 @@ const filterMetricId = ref('')
 
 const editRecordDialogVisible = ref(false)
 const editRecordForm = ref(null)
+
+// 列设置
+const allColumns = [
+  { key: 'record_date', label: '体检日期' },
+  { key: 'person', label: '人员' },
+  { key: 'metric', label: '指标名称' },
+  { key: 'value', label: '数值' },
+  { key: 'expected', label: '期望区间' },
+  { key: 'unit', label: '单位' },
+  { key: 'notes', label: '备注' },
+]
+const visibleColumns = ref([])
+
+const saveColumnState = () => {
+  localStorage.setItem('ledger_visible_columns', JSON.stringify(visibleColumns.value))
+}
+
+const toggleColumn = (key) => {
+  const idx = visibleColumns.value.indexOf(key)
+  if (idx >= 0) {
+    visibleColumns.value.splice(idx, 1)
+  } else {
+    visibleColumns.value.push(key)
+  }
+  saveColumnState()
+}
+
+// 筛选状态持久化
+const saveFilterState = () => {
+  const state = {
+    personId: filterPersonId.value,
+    date: filterDate.value,
+    metricId: filterMetricId.value,
+    page: currentPage.value,
+    pageSize: pageSize.value,
+  }
+  localStorage.setItem('ledger_filter_state', JSON.stringify(state))
+}
+
+const restoreFilterState = () => {
+  try {
+    const saved = localStorage.getItem('ledger_filter_state')
+    if (saved) {
+      const state = JSON.parse(saved)
+      filterPersonId.value = state.personId || ''
+      filterDate.value = state.date || ''
+      filterMetricId.value = state.metricId || ''
+      currentPage.value = state.page || 1
+      pageSize.value = state.pageSize || 20
+    }
+    const cols = localStorage.getItem('ledger_visible_columns')
+    if (cols) {
+      visibleColumns.value = JSON.parse(cols)
+    } else {
+      visibleColumns.value = allColumns.map(c => c.key)
+    }
+  } catch (e) {
+    visibleColumns.value = allColumns.map(c => c.key)
+  }
+  saveColumnState()
+}
 
 const fetchRecords = async () => {
   loading.value = true
@@ -152,6 +237,7 @@ const fetchRecords = async () => {
 
 const handleSearch = () => {
   currentPage.value = 1
+  saveFilterState()
   fetchRecords()
 }
 
@@ -167,6 +253,7 @@ const handleExport = () => {
 
 const handleSizeChange = () => {
   currentPage.value = 1
+  saveFilterState()
   fetchRecords()
 }
 
@@ -191,10 +278,11 @@ const formatExpectedRange = (metric) => {
   return '-'
 }
 
-const getValueClass = (value, metric) => {
-  if (metric.expected_min != null && value < metric.expected_min) return 'abnormal-value'
-  if (metric.expected_max != null && value > metric.expected_max) return 'abnormal-value'
-  return 'normal-value'
+const isAbnormal = (value, metric) => {
+  if (!metric) return false
+  if (metric.expected_min != null && value < metric.expected_min) return true
+  if (metric.expected_max != null && value > metric.expected_max) return true
+  return false
 }
 
 const onSelectionChange = (selection) => {
@@ -271,6 +359,7 @@ const handleDeleteByDate = async () => {
 }
 
 onMounted(() => {
+  restoreFilterState()
   fetchPersons()
   fetchDefinitions()
   fetchRecords()
@@ -279,8 +368,6 @@ onMounted(() => {
 
 <style scoped>
 .page-container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05); min-height: calc(100vh - 140px); }
-.toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-.abnormal-value { color: #F56C6C; font-weight: bold; }
-.normal-value { color: #67C23A; font-weight: bold; }
+.toolbar { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 </style>
