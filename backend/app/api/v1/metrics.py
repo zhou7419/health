@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
+from urllib.parse import quote
 import csv
 import io
 
@@ -119,11 +120,14 @@ def export_metrics_csv(
         ])
 
     output.seek(0)
-    filename = f"体检数据_{date.today().isoformat()}.csv"
+    safe_filename = f"health-export-{date.today().isoformat()}.csv"
+    display_filename = f"体检数据_{date.today().isoformat()}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv; charset=utf-8-sig",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{quote(display_filename)}"
+        }
     )
 
 @router.get("/", response_model=MetricRecordPageResponse)

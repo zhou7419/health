@@ -23,8 +23,8 @@ def _get_db_path() -> str:
     path = url.replace("sqlite:///", "", 1)
     # Docker 中是绝对路径 /app/database/app.db，本地是相对路径
     if not os.path.isabs(path):
-        # 从当前文件位置推算 backend 根目录
-        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # __file__: backend/app/api/v1/stats.py -> 上4层到 backend/
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         path = os.path.join(base, path)
     return path
 
