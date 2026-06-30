@@ -33,3 +33,6 @@ m/.hbuilderx/
 # Editor
 .trae/
 .vscode/
+
+# Logs
+backend/logs/
