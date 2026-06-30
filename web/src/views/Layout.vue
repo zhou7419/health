@@ -13,6 +13,10 @@
       <el-aside width="220px">
         <el-menu :default-active="activeMenu" class="el-menu-vertical" router>
           <el-menu-item index="/">
+            <el-icon><Odometer /></el-icon>
+            <span>数据概览</span>
+          </el-menu-item>
+          <el-menu-item index="/ledger">
             <el-icon><Document /></el-icon>
             <span>数据台账</span>
           </el-menu-item>
@@ -36,6 +40,10 @@
             <el-icon><FirstAidKit /></el-icon>
             <span>健康建议</span>
           </el-menu-item>
+          <el-menu-item index="/backup">
+            <el-icon><Download /></el-icon>
+            <span>数据备份</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       
@@ -49,7 +57,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataBoard, Document, Edit, User, Setting, TrendCharts, FirstAidKit } from '@element-plus/icons-vue'
+import { DataBoard, Document, Edit, User, Setting, TrendCharts, FirstAidKit, Odometer, Download } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const route = useRoute()

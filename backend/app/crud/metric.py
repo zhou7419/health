@@ -128,6 +128,19 @@ def get_metrics(
         query = query.filter(MetricRecord.record_date == record_date)
     return query.order_by(MetricRecord.record_date.desc()).offset(skip).limit(limit).all()
 
+def get_all_metrics_for_export(
+    db: Session, metric_id: Optional[int] = None, record_date: Optional[date] = None, person_id: Optional[int] = None
+) -> List[MetricRecord]:
+    """获取所有匹配记录（无分页限制），用于导出"""
+    query = db.query(MetricRecord).options(joinedload(MetricRecord.metric), joinedload(MetricRecord.person))
+    if person_id is not None:
+        query = query.filter(MetricRecord.person_id == person_id)
+    if metric_id is not None:
+        query = query.filter(MetricRecord.metric_id == metric_id)
+    if record_date:
+        query = query.filter(MetricRecord.record_date == record_date)
+    return query.order_by(MetricRecord.record_date.desc()).all()
+
 def count_metrics(
     db: Session, metric_id: Optional[int] = None, record_date: Optional[date] = None, person_id: Optional[int] = None
 ) -> int:
@@ -164,10 +177,15 @@ def delete_metric(db: Session, record_id: int) -> bool:
     db_record = db.query(MetricRecord).filter(MetricRecord.id == record_id).first()
     if not db_record:
         return False
-    
+
     db.delete(db_record)
     db.commit()
     return True
+
+def delete_metrics_batch(db: Session, ids: List[int]) -> int:
+    deleted = db.query(MetricRecord).filter(MetricRecord.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return deleted
 
 def delete_metrics_by_date(db: Session, record_date: date, person_id: Optional[int] = None) -> int:
     query = db.query(MetricRecord).filter(MetricRecord.record_date == record_date)
@@ -177,3 +195,32 @@ def delete_metrics_by_date(db: Session, record_date: date, person_id: Optional[i
     deleted_count = query.delete(synchronize_session=False)
     db.commit()
     return deleted_count
+
+# --- Health Advice ---
+def create_health_advice(db: Session, person_id: int, content: str, summary: Optional[str] = None):
+    from app.models.metric import HealthAdvice
+    db_advice = HealthAdvice(person_id=person_id, content=content, summary=summary)
+    db.add(db_advice)
+    db.commit()
+    db.refresh(db_advice)
+    return db_advice
+
+def get_health_advices(db: Session, person_id: Optional[int] = None, skip: int = 0, limit: int = 20):
+    from app.models.metric import HealthAdvice
+    query = db.query(HealthAdvice)
+    if person_id is not None:
+        query = query.filter(HealthAdvice.person_id == person_id)
+    return query.order_by(HealthAdvice.created_at.desc()).offset(skip).limit(limit).all()
+
+def get_health_advice(db: Session, advice_id: int):
+    from app.models.metric import HealthAdvice
+    return db.query(HealthAdvice).filter(HealthAdvice.id == advice_id).first()
+
+def delete_health_advice(db: Session, advice_id: int) -> bool:
+    from app.models.metric import HealthAdvice
+    db_advice = db.query(HealthAdvice).filter(HealthAdvice.id == advice_id).first()
+    if not db_advice:
+        return False
+    db.delete(db_advice)
+    db.commit()
+    return True

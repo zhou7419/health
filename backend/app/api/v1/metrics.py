@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -89,6 +90,42 @@ async def upload_metrics_batch(
 
 
 
+@router.get("/export")
+def export_metrics_csv(
+    person_id: Optional[int] = None,
+    metric_id: Optional[int] = None,
+    record_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    导出体检指标记录为CSV文件
+    """
+    records = crud_metric.get_all_metrics_for_export(db, person_id=person_id, metric_id=metric_id, record_date=record_date)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["体检日期", "人员", "指标名称", "数值", "单位", "期望下限", "期望上限", "备注"])
+
+    for r in records:
+        writer.writerow([
+            r.record_date,
+            r.person.name,
+            r.metric.name,
+            r.value,
+            r.metric.unit or "",
+            r.metric.expected_min if r.metric.expected_min is not None else "",
+            r.metric.expected_max if r.metric.expected_max is not None else "",
+            r.notes or ""
+        ])
+
+    output.seek(0)
+    filename = f"体检数据_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @router.get("/", response_model=MetricRecordPageResponse)
 def read_metrics(
     page: int = Query(1, ge=1, description="页码"),
@@ -146,6 +183,17 @@ def delete_metric(
     if not success:
         raise HTTPException(status_code=404, detail="Metric record not found")
     return {"message": "Successfully deleted"}
+
+@router.post("/batch-delete")
+def delete_metrics_batch(
+    ids: List[int] = Query(..., description="要删除的记录ID列表"),
+    db: Session = Depends(get_db)
+):
+    """
+    批量删除多条体检指标记录
+    """
+    deleted = crud_metric.delete_metrics_batch(db, ids=ids)
+    return {"message": f"Successfully deleted {deleted} records", "deleted_count": deleted}
 
 @router.delete("/date/{record_date}")
 def delete_metrics_by_date(

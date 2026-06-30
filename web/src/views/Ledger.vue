@@ -10,6 +10,16 @@
           <el-option v-for="def in definitions" :key="def.id" :label="def.name" :value="def.id"></el-option>
         </el-select>
         <el-button type="primary" @click="handleSearch">搜索</el-button>
+        <el-button @click="handleExport">导出 CSV</el-button>
+        <el-popconfirm
+          v-if="selectedIds.length > 0"
+          title="确定要删除选中的记录吗？"
+          @confirm="handleBatchDelete"
+        >
+          <template #reference>
+            <el-button type="danger" plain>批量删除 ({{ selectedIds.length }})</el-button>
+          </template>
+        </el-popconfirm>
         <el-popconfirm v-if="filterDate" :title="`确定要删除 ${filterDate} 的所有体检记录吗？`" @confirm="handleDeleteByDate">
           <template #reference>
             <el-button type="danger" plain>删除该日记录</el-button>
@@ -21,7 +31,8 @@
       </el-button>
     </div>
 
-    <el-table :data="records" border style="width: 100%" v-loading="loading">
+    <el-table :data="records" border style="width: 100%" v-loading="loading" @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="45" />
       <el-table-column prop="record_date" label="体检日期" width="120" sortable></el-table-column>
       <el-table-column label="人员" width="100">
         <template #default="scope">{{ scope.row.person.name }}</template>
@@ -110,6 +121,7 @@ const submitting = ref(false)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
+const selectedIds = ref([])
 const filterDate = ref('')
 const filterPersonId = ref('')
 const filterMetricId = ref('')
@@ -143,6 +155,16 @@ const handleSearch = () => {
   fetchRecords()
 }
 
+const handleExport = () => {
+  const params = {}
+  if (filterDate.value) params.record_date = filterDate.value
+  if (filterMetricId.value) params.metric_id = filterMetricId.value
+  if (filterPersonId.value) params.person_id = filterPersonId.value
+
+  const query = new URLSearchParams(params).toString()
+  window.open(`/api/v1/metrics/export?${query}`, '_blank')
+}
+
 const handleSizeChange = () => {
   currentPage.value = 1
   fetchRecords()
@@ -173,6 +195,21 @@ const getValueClass = (value, metric) => {
   if (metric.expected_min != null && value < metric.expected_min) return 'abnormal-value'
   if (metric.expected_max != null && value > metric.expected_max) return 'abnormal-value'
   return 'normal-value'
+}
+
+const onSelectionChange = (selection) => {
+  selectedIds.value = selection.map(r => r.id)
+}
+
+const handleBatchDelete = async () => {
+  try {
+    const res = await api.post(`/metrics/batch-delete?ids=${selectedIds.value.join('&ids=')}`)
+    ElMessage.success(`成功删除 ${res.data.deleted_count} 条记录`)
+    selectedIds.value = []
+    fetchRecords()
+  } catch (e) {
+    ElMessage.error('批量删除失败')
+  }
 }
 
 const handleEditRecord = (row) => {

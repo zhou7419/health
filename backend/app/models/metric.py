@@ -44,3 +44,15 @@ class MetricRecord(Base):
 
     person = relationship("Person", back_populates="records")
     metric = relationship("MetricDefinition", back_populates="records")
+
+class HealthAdvice(Base):
+    __tablename__ = "health_advices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
+    content = Column(String, nullable=False)
+    summary = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    person = relationship("Person")

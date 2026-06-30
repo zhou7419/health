@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Layout from '../views/Layout.vue'
 import Login from '../views/Login.vue'
+import Dashboard from '../views/Dashboard.vue'
 import Ledger from '../views/Ledger.vue'
 import Input from '../views/Input.vue'
 import Persons from '../views/Persons.vue'
 import Definitions from '../views/Definitions.vue'
 import Analysis from '../views/Analysis.vue'
 import Advice from '../views/Advice.vue'
+import Backup from '../views/Backup.vue'
 
 const routes = [
   {
@@ -22,6 +24,11 @@ const routes = [
     children: [
       {
         path: '',
+        name: 'Dashboard',
+        component: Dashboard
+      },
+      {
+        path: 'ledger',
         name: 'Ledger',
         component: Ledger
       },
@@ -49,6 +56,11 @@ const routes = [
         path: 'advice',
         name: 'Advice',
         component: Advice
+      },
+      {
+        path: 'backup',
+        name: 'Backup',
+        component: Backup
       }
     ]
   }
@@ -64,7 +76,7 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth !== false && !token) {
     next({ name: 'Login' })
   } else if (to.name === 'Login' && token) {
-    next({ name: 'Ledger' })
+    next({ name: 'Dashboard' })
   } else {
     next()
   }

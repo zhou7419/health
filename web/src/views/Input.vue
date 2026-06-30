@@ -164,11 +164,36 @@
       </el-form-item>
       
       <el-form-item label-width="0" style="margin-top: 30px; text-align: center;">
-        <el-button type="primary" size="large" @click="submitBatch" :loading="submitting">保存所有指标</el-button>
+        <el-button type="primary" size="large" @click="previewBatch">预览并提交</el-button>
         <el-button size="large" @click="$router.push('/')">取消</el-button>
       </el-form-item>
     </el-form>
   </div>
+
+  <!-- 数据预览弹窗 -->
+  <el-dialog v-model="previewVisible" title="请确认要录入的数据" width="700px">
+    <el-table :data="previewData" border max-height="400">
+      <el-table-column prop="name" label="指标名称" width="150"></el-table-column>
+      <el-table-column prop="value" label="数值" width="100"></el-table-column>
+      <el-table-column prop="unit" label="单位" width="80"></el-table-column>
+      <el-table-column prop="expected_min" label="下限" width="80">
+        <template #default="scope">{{ scope.row.expected_min ?? '-' }}</template>
+      </el-table-column>
+      <el-table-column prop="expected_max" label="上限" width="80">
+        <template #default="scope">{{ scope.row.expected_max ?? '-' }}</template>
+      </el-table-column>
+      <el-table-column prop="notes" label="备注" min-width="120">
+        <template #default="scope">{{ scope.row.notes || '-' }}</template>
+      </el-table-column>
+    </el-table>
+    <div style="margin-top: 12px; color: #909399; font-size: 13px;">
+      人员: <b>{{ previewPersonName }}</b> &nbsp;|&nbsp; 日期: <b>{{ batchForm.recordDate }}</b> &nbsp;|&nbsp; 共 <b>{{ previewData.length }}</b> 条指标
+    </div>
+    <template #footer>
+      <el-button @click="previewVisible = false">返回修改</el-button>
+      <el-button type="primary" @click="confirmSubmit" :loading="submitting">确认提交</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -188,6 +213,9 @@ const jsonInput = ref('')
 const importType = ref('text')
 const fileList = ref([])
 const smartFileList = ref([])
+const previewVisible = ref(false)
+const previewData = ref([])
+const previewPersonName = ref('')
 
 const batchForm = reactive({
   person_id: '',
@@ -371,36 +399,59 @@ const submitSmartFileUpload = async () => {
   }
 }
 
-const submitBatch = async () => {
-  if (!batchForm.person_id) return ElMessage.warning('请选择人员')
-  if (!batchForm.recordDate) return ElMessage.warning('请选择体检日期')
-  
-  const validMetrics = batchForm.metrics.filter(m => {
+const getValidMetrics = () => {
+  return batchForm.metrics.filter(m => {
     if (m.value === undefined || m.value === null) return false
     if (m.metric_id === 'custom') return !!m.customName
     return !!m.metric_id
   })
+}
 
+const buildPayload = (validMetrics) => ({
+  person_id: batchForm.person_id,
+  record_date: batchForm.recordDate,
+  metrics: validMetrics.map(m => ({
+    metric_id: m.metric_id === 'custom' ? null : m.metric_id,
+    name: m.metric_id === 'custom' ? m.customName : null,
+    unit: m.metric_id === 'custom' ? m.customUnit : null,
+    expected_min: m.metric_id === 'custom' ? m.expected_min : null,
+    expected_max: m.metric_id === 'custom' ? m.expected_max : null,
+    value: m.value,
+    notes: m.notes
+  }))
+})
+
+const previewBatch = () => {
+  if (!batchForm.person_id) return ElMessage.warning('请选择人员')
+  if (!batchForm.recordDate) return ElMessage.warning('请选择体检日期')
+
+  const validMetrics = getValidMetrics()
   if (validMetrics.length === 0) return ElMessage.warning('至少需要一条有效的指标记录')
 
-  const payload = {
-    person_id: batchForm.person_id,
-    record_date: batchForm.recordDate,
-    metrics: validMetrics.map(m => ({
-      metric_id: m.metric_id === 'custom' ? null : m.metric_id,
-      name: m.metric_id === 'custom' ? m.customName : null,
-      unit: m.metric_id === 'custom' ? m.customUnit : null,
-      expected_min: m.metric_id === 'custom' ? m.expected_min : null,
-      expected_max: m.metric_id === 'custom' ? m.expected_max : null,
-      value: m.value,
-      notes: m.notes
-    }))
-  }
+  const person = persons.value.find(p => p.id === batchForm.person_id)
+  previewPersonName.value = person ? person.name : '-'
+
+  previewData.value = validMetrics.map(m => ({
+    name: m.metric_id === 'custom' ? m.customName : (definitions.value.find(d => d.id === m.metric_id)?.name || '-'),
+    value: m.value,
+    unit: m.metric_id === 'custom' ? m.customUnit : (definitions.value.find(d => d.id === m.metric_id)?.unit || ''),
+    expected_min: m.metric_id === 'custom' ? m.expected_min : (definitions.value.find(d => d.id === m.metric_id)?.expected_min),
+    expected_max: m.metric_id === 'custom' ? m.expected_max : (definitions.value.find(d => d.id === m.metric_id)?.expected_max),
+    notes: m.notes
+  }))
+
+  previewVisible.value = true
+}
+
+const confirmSubmit = async () => {
+  const validMetrics = getValidMetrics()
+  const payload = buildPayload(validMetrics)
 
   submitting.value = true
   try {
     await api.post('/metrics/batch', payload)
     ElMessage.success(`成功保存 ${validMetrics.length} 条记录`)
+    previewVisible.value = false
     router.push('/')
   } catch (error) {
     ElMessage.error('保存失败')
