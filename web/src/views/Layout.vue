@@ -8,17 +8,13 @@
         <el-button size="small" @click="logout">退出登录</el-button>
       </div>
     </el-header>
-    
+
     <el-container>
       <el-aside width="220px">
         <el-menu :default-active="activeMenu" class="el-menu-vertical" router>
           <el-menu-item index="/">
             <el-icon><Odometer /></el-icon>
             <span>数据概览</span>
-          </el-menu-item>
-          <el-menu-item index="/test">
-            <el-icon><MagicStick /></el-icon>
-            <span>测试</span>
           </el-menu-item>
           <el-menu-item index="/ledger">
             <el-icon><Document /></el-icon>
@@ -48,9 +44,13 @@
             <el-icon><Download /></el-icon>
             <span>数据备份</span>
           </el-menu-item>
+          <el-menu-item v-if="authUser === 'admin'" index="/test">
+            <el-icon><Tools /></el-icon>
+            <span>系统诊断</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
-      
+
       <el-main>
         <router-view></router-view>
       </el-main>
@@ -61,7 +61,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataBoard, Document, Edit, User, Setting, TrendCharts, FirstAidKit, Odometer, Download, MagicStick } from '@element-plus/icons-vue'
+import { DataBoard, Document, Edit, User, Setting, TrendCharts, FirstAidKit, Odometer, Download, Tools } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const route = useRoute()
@@ -88,15 +88,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.el-header { 
-  background-color: #409EFF; 
-  color: white; 
-  line-height: 60px; 
-  font-size: 20px; 
-  font-weight: bold; 
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
-  display: flex; 
-  align-items: center; 
+.el-header {
+  background-color: #409EFF;
+  color: white;
+  line-height: 60px;
+  font-size: 20px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
 }
 .el-header .logo { margin-right: 10px; font-size: 24px; }
 .el-aside { background-color: #fff; box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05); z-index: 10; }
