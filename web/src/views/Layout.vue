@@ -40,7 +40,7 @@
             <el-icon><FirstAidKit /></el-icon>
             <span>健康建议</span>
           </el-menu-item>
-          <el-menu-item index="/backup">
+          <el-menu-item v-if="authUser === 'admin'" index="/backup">
             <el-icon><Download /></el-icon>
             <span>数据备份</span>
           </el-menu-item>
