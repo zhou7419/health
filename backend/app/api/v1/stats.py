@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import os
 import shutil
 import tempfile
+import time
 
 from app.api.deps import get_current_user, get_db
 from app.config import settings
@@ -14,6 +15,8 @@ from app.utils.logger import get_logger
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
+
+_start_time = time.time()
 
 
 @router.get("/health", include_in_schema=False)
@@ -28,7 +31,7 @@ def health_check(db: Session = Depends(get_db)):
     return {
         "status": "ok" if db_ok else "degraded",
         "database": "connected" if db_ok else "disconnected",
-        "uptime": 0,
+        "uptime": int(time.time() - _start_time),
     }
 
 
