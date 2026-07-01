@@ -15,7 +15,7 @@ services:
       - health-logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request,json; json.loads(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/stats/health').read())"]
       interval: 30s
       timeout: 5s
       retries: 3

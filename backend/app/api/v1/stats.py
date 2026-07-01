@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from datetime import date, timedelta
 import os
 import shutil
@@ -14,6 +14,22 @@ from app.utils.logger import get_logger
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = get_logger(__name__)
+
+
+@router.get("/health", include_in_schema=False)
+def health_check(db: Session = Depends(get_db)):
+    """健康检查接口"""
+    db_ok = False
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "connected" if db_ok else "disconnected",
+        "uptime": 0,
+    }
 
 
 def _get_db_path() -> str:

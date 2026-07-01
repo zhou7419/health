@@ -87,19 +87,11 @@ onMounted(async () => {
   apiBaseUrl.value = api.defaults?.baseURL || '/api/v1'
 
   try {
-    const res = await api.get('/stats/stats')
-    backendStatus.value = 'ok'
-    backendInfo.value = { status: 'ok', database: 'connected', uptime: 0 }
+    const healthRes = await api.get('/stats/health')
+    backendInfo.value = healthRes.data
+    backendStatus.value = healthRes.data.status
   } catch (e) {
     backendStatus.value = 'error'
-  }
-
-  try {
-    const healthRes = await fetch('/health').then(r => r.json())
-    backendInfo.value = healthRes
-    backendStatus.value = healthRes.status
-  } catch (e) {
-    // fallback
   }
 })
 
@@ -119,7 +111,7 @@ const runTests = async () => {
   const endpoints = [
     { name: 'Auth - GET /auth/me', url: '/auth/me' },
     { name: 'Stats - GET /stats/stats', url: '/stats/stats' },
-    { name: 'Health - GET /health', url: '/health', direct: true },
+    { name: 'Health - GET /stats/health', url: '/stats/health' },
     { name: 'Persons - GET /persons/', url: '/persons/?page_size=1' },
     { name: 'Definitions - GET /definitions/', url: '/definitions/?page_size=1' },
     { name: 'Metrics - GET /metrics/', url: '/metrics/?page_size=1' },
