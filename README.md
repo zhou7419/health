@@ -1,59 +1,127 @@
 # Health Metrics 台账
 
-基于 FastAPI (后端) + Vue3 (前端) 的前后端分离体检指标台账系统。
+基于 FastAPI (后端) + Vue3 (前端) 的前后端分离体检指标台账系统。支持多人员、多指标管理，AI 智能解析体检报告，趋势分析图表，AI 健康建议生成。
+
+## 功能一览
+
+| 模块 | 功能 |
+|------|------|
+| 📊 **数据概览** | 仪表盘统计卡片、人员记录排行 |
+| 📋 **数据台账** | 体检记录浏览、筛选搜索、分页、CSV导出、批量删除 |
+| ✏️ **批量录入** | 手动录入 / JSON解析 / AI智能解析 / 文件上传 / CSV导入，录入前预览确认 |
+| 👤 **人员管理** | 人员增删、分页 |
+| 📐 **指标管理** | 指标字典管理、模糊搜索、分页 |
+| 📈 **趋势分析** | 多人员×多指标对比折线图、参考区间标记、滚轮缩放 |
+| 🤖 **健康建议** | AI 生成健康报告（基于DeepSeek），自动保存历史记录 |
+| 💾 **数据备份** | 数据库下载备份、上传恢复 |
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 后端框架 | Python FastAPI |
+| 数据库 | SQLite + SQLAlchemy ORM |
+| 前端框架 | Vue 3 + Vite + Element Plus |
+| 图表 | ECharts |
+| AI | DeepSeek API（自然语言解析 + 健康建议） |
+| 部署 | Docker Compose / 1Panel |
+| 移动端 | uni-app（HBuilderX，支持 Android/iOS/小程序） |
 
 ## 本地开发启动
 
-### 一键启动 (推荐)
-
-我们在项目根目录提供了便捷的启动脚本，可以同时启动后端 API 和前端服务：
-
-- **Windows 用户**: 直接双击运行 `start_dev.bat`
-- **跨平台/终端用户**: 运行 `python start_dev.py` (可以通过 `Ctrl+C` 一键关闭所有服务)
-
-> **注意**：首次运行前，请确保您已经完成下方的依赖安装步骤。
-
-### 1. 启动后端 (FastAPI)
+### 前置准备
 
 ```bash
+# 后端
 cd backend
+python -m venv .venv
+.venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env，填入 DEEPSEEK_API_KEY、SECRET_KEY、ADMIN_PASSWORD
-uvicorn app.main:app --reload --port 8000
-```
-后端 API 地址：`http://127.0.0.1:8000/docs`
 
-### 2. 启动前端 (Vue3 + Vite)
-
-```bash
+# 前端
 cd web
 npm install
+```
+
+### 一键启动
+
+- **Windows**: 双击 `start_dev.bat`
+- **跨平台**: `python start_dev.py`
+
+### 手动启动
+
+```bash
+# 终端1 - 后端
+cd backend
+uvicorn app.main:app --reload --port 8000
+# 访问 http://127.0.0.1:8000/docs
+
+# 终端2 - 前端
+cd web
 npm run dev
+# 访问 http://localhost:5173
 ```
-前端访问地址：`http://localhost:5173` (具体端口看终端输出)
 
-## 生产部署 (Docker Compose / 1Panel)
+### 默认账号
 
-推荐使用仓库自带的 `docker-compose.yml` 进行一键部署，它包含了 `backend` 和 `web` 两个服务。
+```
+用户名: admin
+密码: zhouyou123
+```
 
-1. **准备配置文件**：确保在根目录或 1Panel 环境变量中设置以下变量：
-   - `DEEPSEEK_API_KEY`
-   - `SECRET_KEY`
-   - `ADMIN_PASSWORD`
+## Docker 部署
 
-2. **启动**：
 ```bash
-docker-compose up -d --build
+# 首次部署
+git clone https://github.com/zhou7419/health.git
+cd health
+docker compose up -d --build
+
+# 更新代码后重建
+git pull
+docker compose build --no-cache
+docker compose up -d
+
+# 访问 http://服务器IP:8080
 ```
 
-3. **访问**：
-通过宿主机的 `80` 端口访问系统（Nginx 会自动将 `/api` 的请求反向代理到后端的 8000 端口）。
+## 自动部署
 
-4. **更新代码 (Git Pull 后如何更新项目)**：
-如果您在 1Panel 上通过 Git Pull 更新了代码，由于代码可能包含依赖变更或前端打包变更，您需要重新构建镜像并重启容器。请在终端执行以下命令：
-```bash
-docker-compose down
-docker-compose up -d --build
+本项目配置了 GitHub Actions 自动部署（`push main` 后触发）：
+
+1. GitHub 自动 SSH 到服务器
+2. 执行 `git pull` 拉取最新代码
+3. 执行 `docker compose build --no-cache`
+4. 执行 `docker compose up -d`
+
+需要在 GitHub 仓库 **Settings → Secrets → Actions** 配置：
+
+| Secret | 说明 |
+|--------|------|
+| `SSH_HOST` | 服务器 IP |
+| `SSH_PORT` | SSH 端口（默认22） |
+| `SSH_USER` | 登录用户名 |
+| `SSH_KEY` | SSH 私钥内容 |
+| `DEPLOY_PATH` | 项目路径，如 `/root/health` |
+
+## 项目结构
+
 ```
-> **注意**：由于挂载了 `./database` 目录，您的所有体检数据都会被安全保留，无需担心丢失。
+health/
+├── backend/          # FastAPI 后端
+│   ├── app/
+│   │   ├── api/v1/    # API 路由
+│   │   ├── crud/      # 数据库操作
+│   │   ├── models/    # 数据模型
+│   │   ├── schemas/   # Pydantic 模式
+│   │   └── utils/     # 工具函数
+│   └── Dockerfile
+├── web/              # Vue3 前端
+│   ├── src/views/     # 页面组件
+│   └── Dockerfile
+├── m/                # uni-app 移动端
+├── docker-compose.yml
+└── start_dev.bat
+```
