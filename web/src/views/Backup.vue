@@ -2,6 +2,8 @@
   <div class="page-container">
     <div class="toolbar"><h3>数据库备份与恢复</h3></div>
 
+    <el-alert title="此页面仅管理员可见" type="warning" :closable="false" show-icon style="margin-bottom: 16px;" />
+
     <el-row :gutter="20">
       <el-col :span="12">
         <el-card shadow="hover">
