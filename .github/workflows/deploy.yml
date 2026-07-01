@@ -18,8 +18,10 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
-            echo "=== Pull latest code ==="
-            git pull
+            echo "=== Pull latest code (with retry) ==="
+            for i in 1 2 3; do
+              git pull && break || sleep 5
+            done
             echo "=== Build & restart ==="
             docker compose build --no-cache
             docker compose up -d
