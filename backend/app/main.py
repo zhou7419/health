@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import os
+import time
 
 from app.config import settings
 from app.api.v1 import api_router
-from app.database import Base, engine
+from app.database import Base, engine, SessionLocal
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -13,6 +15,23 @@ app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
 )
+
+_start_time = time.time()
+
+
+@app.get("/health", include_in_schema=False)
+def health_check():
+    """健康检查接口（Docker healthcheck 使用）"""
+    db_ok = False
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        db_ok = True
+    except Exception:
+        pass
+    return {"status": "ok" if db_ok else "degraded", "database": "connected" if db_ok else "disconnected", "uptime": int(time.time() - _start_time)}
+
 
 # 配置 CORS 允许跨域请求（针对前端开发服务器等）
 app.add_middleware(
