@@ -1,7 +1,16 @@
 <template>
   <view class="page-wrap">
-    <!-- 新增按钮 -->
+    <!-- 搜索 + 新增 -->
     <view class="top-bar card">
+      <view class="search-row">
+        <input
+          class="search-input"
+          v-model="searchKeyword"
+          placeholder="搜索指标名称..."
+          @input="onSearchInput"
+        />
+        <text class="search-clear" v-if="searchKeyword" @click="clearSearch">✕</text>
+      </view>
       <button class="btn-add" @click="openDialog()">＋ 新增指标</button>
     </view>
 
@@ -84,6 +93,28 @@ const loading = ref(false)
 const submitting = ref(false)
 const dialogPopup = ref(null)
 const isEdit = ref(false)
+const searchKeyword = ref('')
+let searchTimer = null
+
+const fetchDefinitions = async (name) => {
+  loading.value = true
+  try {
+    definitions.value = await api.get('/definitions/', { limit: 1000, name: name || undefined })
+  } catch (e) {}
+  loading.value = false
+}
+
+const onSearchInput = () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    fetchDefinitions(searchKeyword.value.trim())
+  }, 400)
+}
+
+const clearSearch = () => {
+  searchKeyword.value = ''
+  fetchDefinitions()
+}
 
 const form = reactive({
   id: null,
@@ -92,14 +123,6 @@ const form = reactive({
   expected_min: undefined,
   expected_max: undefined
 })
-
-const fetchDefinitions = async () => {
-  loading.value = true
-  try {
-    definitions.value = await api.get('/definitions/', { limit: 1000 })
-  } catch (e) {}
-  loading.value = false
-}
 
 const openDialog = (def = null) => {
   if (def) {
@@ -171,6 +194,31 @@ onMounted(() => {
 <style lang="scss" scoped>
 .top-bar {
   text-align: center;
+
+  .search-row {
+    position: relative;
+    margin-bottom: 16rpx;
+
+    .search-input {
+      width: 100%;
+      height: 72rpx;
+      background: #f5f7fa;
+      border-radius: 36rpx;
+      padding: 0 72rpx 0 32rpx;
+      font-size: 26rpx;
+      box-sizing: border-box;
+    }
+
+    .search-clear {
+      position: absolute;
+      right: 20rpx;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 28rpx;
+      color: #c0c4cc;
+      padding: 8rpx;
+    }
+  }
 
   .btn-add {
     width: 100%;

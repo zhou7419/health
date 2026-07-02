@@ -149,6 +149,19 @@
             v-model="m.customUnit"
             placeholder="单位"
           />
+          <!-- 校验标签 -->
+          <view
+            v-if="getValueWarning(m, i)"
+            :class="['val-tag', getValueWarning(m, i).type]"
+          >
+            <text class="val-tag-icon">{{ getValueWarning(m, i).type === 'danger' ? '⚠' : '⚡' }}</text>
+            <text class="val-tag-text">{{ getValueWarning(m, i).msg }}</text>
+          </view>
+        </view>
+
+        <!-- 重复指标提示 -->
+        <view v-if="getDuplicateWarning(m, i)" class="dup-warning">
+          <text class="dup-text">⚠ 同批次已存在「{{ getDuplicateWarning(m, i) }}」，请确认是否重复录入</text>
         </view>
 
         <!-- 参考范围（自定义时显示） -->
@@ -292,6 +305,34 @@ const getMetricLabel = (m) => {
 const getMetricUnit = (id) => {
   const def = definitions.value.find(d => d.id === id)
   return def?.unit || ''
+}
+
+// 值范围校验
+const getValueWarning = (m, idx) => {
+  if (m.value === undefined || m.value === null || m.value === '') return null
+  const def = definitions.value.find(d => d.id === m.metric_id)
+  if (!def) return null
+  const val = Number(m.value)
+  if (isNaN(val)) return null
+  if (def.expected_max != null && val > def.expected_max) {
+    return { type: 'danger', msg: `超过上限 ${def.expected_max}${def.unit || ''}` }
+  }
+  if (def.expected_min != null && val < def.expected_min) {
+    return { type: 'warn', msg: `低于下限 ${def.expected_min}${def.unit || ''}` }
+  }
+  return null
+}
+
+// 同批次重复检测
+const getDuplicateWarning = (m, idx) => {
+  if (!m.metric_id || m.metric_id === 'custom') return null
+  const def = definitions.value.find(d => d.id === m.metric_id)
+  if (!def) return null
+  const sameMetrics = form.metrics.filter((item, i) =>
+    i !== idx && item.metric_id === m.metric_id && item.value !== undefined && item.value !== null && item.value !== ''
+  )
+  if (sameMetrics.length > 0) return def.name
+  return null
 }
 
 // 解析结果填表
@@ -674,6 +715,43 @@ onMounted(() => {
       background: #f5f7fa;
       padding: 4rpx 12rpx;
       border-radius: 6rpx;
+    }
+
+    .val-tag {
+      display: flex;
+      align-items: center;
+      margin-left: 8rpx;
+      padding: 2rpx 12rpx;
+      border-radius: 20rpx;
+      font-size: 20rpx;
+      flex-shrink: 0;
+
+      &.danger {
+        background: #fef0f0;
+        color: #F56C6C;
+        border: 1rpx solid #fde2e2;
+      }
+
+      &.warn {
+        background: #fdf6ec;
+        color: #E6A23C;
+        border: 1rpx solid #faecd8;
+      }
+
+      .val-tag-icon { margin-right: 4rpx; }
+    }
+  }
+
+  .dup-warning {
+    margin-bottom: 12rpx;
+    padding: 8rpx 12rpx;
+    background: #fdf6ec;
+    border-radius: 6rpx;
+    border: 1rpx solid #faecd8;
+
+    .dup-text {
+      font-size: 22rpx;
+      color: #E6A23C;
     }
   }
 
