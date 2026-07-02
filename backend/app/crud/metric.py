@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import asc, func
 from typing import List, Optional
 from datetime import date
-from app.models.metric import MetricRecord, MetricDefinition, Person
+from app.models.metric import MetricRecord, MetricDefinition, Person, HealthAdvice
 from app.schemas.metric import (
     MetricRecordCreate,
     BatchMetricCreate,
@@ -183,7 +183,7 @@ def delete_metric(db: Session, record_id: int) -> bool:
     return True
 
 def delete_metrics_batch(db: Session, ids: List[int]) -> int:
-    deleted = db.query(MetricRecord).filter(MetricRecord.id.in_(ids)).delete(synchronize_session=False)
+    deleted = db.query(MetricRecord).filter(MetricRecord.id.in_(ids)).delete()
     db.commit()
     return deleted
 
@@ -192,13 +192,12 @@ def delete_metrics_by_date(db: Session, record_date: date, person_id: Optional[i
     if person_id is not None:
         query = query.filter(MetricRecord.person_id == person_id)
     
-    deleted_count = query.delete(synchronize_session=False)
+    deleted_count = query.delete()
     db.commit()
     return deleted_count
 
 # --- Health Advice ---
 def create_health_advice(db: Session, person_id: int, content: str, summary: Optional[str] = None):
-    from app.models.metric import HealthAdvice
     db_advice = HealthAdvice(person_id=person_id, content=content, summary=summary)
     db.add(db_advice)
     db.commit()
@@ -206,21 +205,25 @@ def create_health_advice(db: Session, person_id: int, content: str, summary: Opt
     return db_advice
 
 def get_health_advices(db: Session, person_id: Optional[int] = None, skip: int = 0, limit: int = 20):
-    from app.models.metric import HealthAdvice
     query = db.query(HealthAdvice)
     if person_id is not None:
         query = query.filter(HealthAdvice.person_id == person_id)
     return query.order_by(HealthAdvice.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_health_advice(db: Session, advice_id: int):
-    from app.models.metric import HealthAdvice
     return db.query(HealthAdvice).filter(HealthAdvice.id == advice_id).first()
 
 def delete_health_advice(db: Session, advice_id: int) -> bool:
-    from app.models.metric import HealthAdvice
     db_advice = db.query(HealthAdvice).filter(HealthAdvice.id == advice_id).first()
     if not db_advice:
         return False
     db.delete(db_advice)
     db.commit()
     return True
+ 
+
+def count_health_advices(db: Session, person_id: Optional[int] = None) -> int:
+     query = db.query(func.count(HealthAdvice.id))
+     if person_id is not None:
+         query = query.filter(HealthAdvice.person_id == person_id)
+     return query.scalar()

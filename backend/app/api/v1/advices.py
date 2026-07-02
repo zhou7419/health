@@ -39,12 +39,11 @@ def list_advices(
     person_id: Optional[int] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
 ):
     """获取健康建议历史"""
     skip = (page - 1) * page_size
     items = crud_metric.get_health_advices(db, person_id=person_id, skip=skip, limit=page_size)
-    total = len(items) if False else 0  # simplified - real count would need a function
+    total = crud_metric.count_health_advices(db, person_id=person_id)
     return AdvicePageResponse(items=items, total=total)
 
 

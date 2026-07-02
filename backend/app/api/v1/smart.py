@@ -90,7 +90,7 @@ async def parse_smart_text(request: SmartParseRequest):
                 parsed_data = json.loads(raw_response)
                 return parsed_data
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse JSON from Ollama response: {raw_response}")
+                logger.error(f"Failed to parse JSON from DeepSeek response: {raw_response}")
                 raise HTTPException(status_code=500, detail="模型返回的数据无法解析为JSON格式")
                 
     except httpx.RequestError as e:

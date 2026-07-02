@@ -414,7 +414,7 @@ const handleSmartFileChange = (file, fileList) => {
   smartFileList.value = fileList
 }
 
-const handleSmartExceed = (files) => {
+const handleSmartExceed = () => {
   ElMessage.warning('最多只能上传 10 个文件或图片')
 }
 
@@ -514,7 +514,7 @@ const handleFileChange = (file) => {
   fileList.value = [file]
 }
 
-const handleExceed = (files) => {
+const handleExceed = () => {
   fileList.value = [files[0]]
 }
 

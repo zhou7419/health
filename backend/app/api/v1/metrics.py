@@ -157,8 +157,6 @@ def get_metric_history(
     获取某人某一指标所有的历史数据，按时间升序排列，用于生成图表
     """
     history = crud_metric.get_metric_history(db, metric_id=metric_id, person_id=person_id)
-    if not history:
-        raise HTTPException(status_code=404, detail=f"Metric {metric_id} history for person {person_id} not found")
     return history
 
 @router.put("/{record_id}", response_model=MetricRecordResponse)
