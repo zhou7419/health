@@ -2,7 +2,11 @@
 .env
 .env.*
 !.env.example
+
+# Database (SQLite)
 backend/database/app.db
+backend/database/app.db.bak
+/database/
 server.log
 __pycache__/
 *.pyc
