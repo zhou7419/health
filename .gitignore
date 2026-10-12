@@ -40,3 +40,4 @@ m/.hbuilderx/
 
 # Logs
 backend/logs/
+dsh.log
