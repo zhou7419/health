@@ -13,6 +13,9 @@
         />
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button type="primary" @click="openDefDialog()">新增指标定义</el-button>
+        <el-button type="warning" :loading="detectLoading" @click="handleDetectSynonyms" style="margin-left: 8px;">
+          <el-icon style="margin-right: 4px;"><Search /></el-icon>检测同义指标
+        </el-button>
       </div>
     </div>
 
@@ -71,12 +74,70 @@
         <el-button type="primary" @click="submitDef" :loading="submitting">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 同义指标检测弹窗 -->
+    <el-dialog v-model="synonymDialogVisible" title="检测到同义指标" width="750px" :close-on-click-modal="false">
+      <template v-if="synonymSuggestions.length === 0 && !detectLoading">
+        <el-empty description="未检测到同义指标" />
+      </template>
+
+      <template v-if="synonymSuggestions.length > 0">
+        <el-alert
+          title="以下是指标含义相同但名称不同的项目，请勾选需要合并的项后点击「确认修改」。改名后原指标的数据将合并到目标指标中。"
+          type="info"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 16px;"
+        />
+
+        <el-table :data="synonymSuggestions" border style="width: 100%" max-height="400">
+          <el-table-column width="55">
+            <template #header>
+              <el-checkbox v-model="checkAll" @change="handleCheckAllChange" />
+            </template>
+            <template #default="scope">
+              <el-checkbox v-model="scope.row.checked" @change="handleCheckChange" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="name" label="当前名称" width="180">
+            <template #default="scope">
+              <el-tag type="warning">{{ scope.row.name }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="60">
+            <template #default>
+              <el-icon><ArrowRight /></el-icon>
+            </template>
+          </el-table-column>
+          <el-table-column prop="target_name" label="建议改名" width="180">
+            <template #default="scope">
+              <el-tag type="success">{{ scope.row.target_name }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reason" label="原因" min-width="200" />
+        </el-table>
+      </template>
+
+      <template #footer>
+        <el-button @click="synonymDialogVisible = false">关闭</el-button>
+        <el-button
+          v-if="synonymSuggestions.length > 0"
+          type="primary"
+          :loading="applyLoading"
+          :disabled="checkedCount === 0"
+          @click="handleApplyRename"
+        >
+          确认修改（{{ checkedCount }}项）
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, ArrowRight } from '@element-plus/icons-vue'
 import api from '../utils/api'
 
 const definitions = ref([])
@@ -93,6 +154,17 @@ const defForm = reactive({
   unit: '',
   expected_min: undefined,
   expected_max: undefined
+})
+
+// 同义指标检测相关
+const detectLoading = ref(false)
+const synonymDialogVisible = ref(false)
+const synonymSuggestions = ref([])
+const applyLoading = ref(false)
+const checkAll = ref(true)
+
+const checkedCount = computed(() => {
+  return synonymSuggestions.value.filter(s => s.checked).length
 })
 
 const fetchDefinitions = async () => {
@@ -144,7 +216,7 @@ const openDefDialog = (row = null) => {
 const submitDef = async () => {
   if (!defForm.name) return ElMessage.warning('请输入指标名称')
   submitting.value = true
-  
+
   const payload = {
     name: defForm.name,
     unit: defForm.unit || null,
@@ -176,6 +248,109 @@ const handleDeleteDef = async (row) => {
     fetchDefinitions()
   } catch (error) {
     ElMessage.error('删除失败')
+  }
+}
+
+// 检测同义指标
+const handleDetectSynonyms = async () => {
+  detectLoading.value = true
+  try {
+    const res = await api.post('/smart/detect-synonyms')
+    const suggestions = res.data.suggestions || []
+
+    // 为每条建议添加 checked 标记，默认选中
+    synonymSuggestions.value = suggestions.map(s => ({
+      ...s,
+      checked: true
+    }))
+    checkAll.value = true
+
+    if (suggestions.length === 0) {
+      ElMessage.info('未检测到同义指标，所有指标名称都是唯一的')
+    }
+
+    synonymDialogVisible.value = true
+  } catch (error) {
+    const msg = error.response?.data?.detail || '检测失败，请检查 DeepSeek API 配置'
+    ElMessage.error(msg)
+  } finally {
+    detectLoading.value = false
+  }
+}
+
+const handleCheckAllChange = (val) => {
+  synonymSuggestions.value.forEach(s => {
+    s.checked = val
+  })
+}
+
+const handleCheckChange = () => {
+  const allChecked = synonymSuggestions.value.every(s => s.checked)
+  const noneChecked = synonymSuggestions.value.every(s => !s.checked)
+  if (allChecked) {
+    checkAll.value = true
+  } else if (noneChecked) {
+    checkAll.value = false
+  } else {
+    checkAll.value = false
+  }
+}
+
+// 确认修改
+const handleApplyRename = async () => {
+  const selected = synonymSuggestions.value.filter(s => s.checked)
+  if (selected.length === 0) {
+    ElMessage.warning('请至少选择一项')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要将选中的 ${selected.length} 项指标进行改名/合并吗？此操作不可撤销！`,
+      '确认修改',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  applyLoading.value = true
+  try {
+    const renames = selected.map(s => ({
+      name: s.name,
+      target_name: s.target_name
+    }))
+    const res = await api.post('/smart/apply-rename', { renames })
+
+    const results = res.data.results || []
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
+
+    // 显示详细结果
+    const detailMsg = results.map(r => {
+      if (r.success) {
+        if (r.action === 'merged') return `✅ ${r.name} → ${r.target_name}（已合并）`
+        if (r.action === 'renamed') return `✅ ${r.name} → ${r.target_name}（已改名）`
+        if (r.action === 'skipped') return `⏭️ ${r.name} → ${r.target_name}（无需变更）`
+        return `✅ ${r.name} → ${r.target_name}`
+      } else {
+        return `❌ ${r.name} → ${r.target_name}：${r.error || '失败'}`
+      }
+    }).join('\n')
+
+    ElMessageBox.alert(detailMsg, `执行完成（成功${successCount}项${failCount > 0 ? `，失败${failCount}项` : ''}）`, {
+      confirmButtonText: '确定',
+      type: failCount > 0 ? 'warning' : 'success'
+    })
+
+    synonymDialogVisible.value = false
+    // 刷新指标列表
+    fetchDefinitions()
+  } catch (error) {
+    const msg = error.response?.data?.detail || '修改失败'
+    ElMessage.error(msg)
+  } finally {
+    applyLoading.value = false
   }
 }
 

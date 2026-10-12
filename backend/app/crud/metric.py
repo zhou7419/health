@@ -42,6 +42,44 @@ def get_definitions(db: Session, skip: int = 0, limit: int = 100, name: Optional
         query = query.filter(MetricDefinition.name.like(f"%{name}%"))
     return query.order_by(MetricDefinition.id.asc()).offset(skip).limit(limit).all()
 
+def get_all_definitions(db: Session) -> List[MetricDefinition]:
+    """获取所有指标定义（不分页），用于同义检测"""
+    return db.query(MetricDefinition).order_by(MetricDefinition.id.asc()).all()
+
+def merge_definition(db: Session, source_name: str, target_name: str) -> dict:
+    """
+    将源指标合并到目标指标。
+    - 如果目标指标存在：将源指标的所有记录迁移到目标指标，然后删除源指标
+    - 如果目标指标不存在：直接将源指标改名为目标名称
+    """
+    source = db.query(MetricDefinition).filter(MetricDefinition.name == source_name).first()
+    if not source:
+        return {"success": False, "action": "error", "error": f"源指标 '{source_name}' 不存在"}
+
+    if source_name == target_name:
+        return {"success": True, "action": "skipped", "error": None}
+
+    target = db.query(MetricDefinition).filter(MetricDefinition.name == target_name).first()
+
+    if target:
+        # 目标已存在：将源指标的所有记录迁移到目标指标
+        record_count = db.query(MetricRecord).filter(MetricRecord.metric_id == source.id).count()
+        db.query(MetricRecord).filter(MetricRecord.metric_id == source.id).update(
+            {MetricRecord.metric_id: target.id}
+        )
+        db.commit()
+        # 删除源指标（此时已无关联记录）
+        db.delete(source)
+        db.commit()
+        return {"success": True, "action": "merged", "error": None, "moved_records": record_count}
+    else:
+        # 目标不存在：直接改名
+        old_name = source.name
+        source.name = target_name
+        db.commit()
+        db.refresh(source)
+        return {"success": True, "action": "renamed", "error": None}
+
 def count_definitions(db: Session, name: Optional[str] = None) -> int:
     query = db.query(func.count(MetricDefinition.id))
     if name:

@@ -1,6 +1,8 @@
 from .metric import (
     get_definitions,
     count_definitions,
+    get_all_definitions,
+    merge_definition,
     create_definition,
     update_definition,
     delete_definition,

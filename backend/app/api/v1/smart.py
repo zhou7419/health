@@ -7,7 +7,15 @@ import os
 from typing import List
 import base64
 
-from app.schemas.metric import SmartParseRequest, HealthAdviceRequest
+from app.schemas.metric import (
+    SmartParseRequest,
+    HealthAdviceRequest,
+    SynonymDetectResponse,
+    SynonymSuggestion,
+    ApplyRenameRequest,
+    ApplyRenameResponse,
+    ApplyRenameResult,
+)
 from app.api.deps import get_current_user, get_db
 from app.crud import metric as crud_metric
 from app.config import settings
@@ -151,6 +159,149 @@ async def parse_smart_file(files: List[UploadFile] = File(...)):
         images=images_base64 if images_base64 else None
     )
     return await parse_smart_text(request)
+
+@router.post("/detect-synonyms", response_model=SynonymDetectResponse)
+async def detect_synonyms(db: Session = Depends(get_db)):
+    """
+    使用 DeepSeek 检测体检指标定义中含义相同但名称不同的指标（同义词），
+    返回建议改名的列表供用户确认。
+    """
+    # 1. 获取所有指标定义
+    definitions = crud_metric.get_all_definitions(db)
+    total = len(definitions)
+
+    if total < 2:
+        return SynonymDetectResponse(suggestions=[], total_definitions=total)
+
+    # 2. 构造指标名称列表
+    names = [d.name for d in definitions]
+    names_text = "\n".join([f"- {name}" for name in names])
+
+    prompt = f"""你是一个体检指标术语标准化专家。
+请分析以下体检指标名称列表，找出含义相同但名称不同的指标（同义词对）。
+
+规则：
+1. 严格返回 JSON 对象，包含一个 "suggestions" 键，值为数组
+2. 数组中的每个元素必须包含：
+   - "name": "当前指标名称（需要被改名的指标）"
+   - "target_name": "标准名称（保留的标准名称，作为改名目标）"
+   - "reason": "为什么它们是同义词的简短说明（10-30字）"
+3. 只将真正表示同一医学概念的指标配对，不要强行将不同的指标配对
+4. 如果所有指标名称都是唯一的没有同义词，返回 {{"suggestions": []}}
+5. 中文名称优先作为 target_name（标准名称）
+6. 每个指标名称只能出现一次，不要重复建议同一个指标的改名
+
+指标名称列表：
+{names_text}
+"""
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": "你是一个严格输出JSON格式数据的医疗术语标准化专家。"},
+            {"role": "user", "content": prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1
+    }
+    headers = _deepseek_headers()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(_deepseek_url("/chat/completions"), json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+
+            raw_response = result.get("choices", [{}])[0].get("message", {}).get("content", "{}").strip()
+
+            # 清理可能的 markdown 标记
+            raw_response = re.sub(r'^```json\s*', '', raw_response)
+            raw_response = re.sub(r'\s*```$', '', raw_response)
+
+            try:
+                parsed = json.loads(raw_response)
+                suggestions_data = parsed.get("suggestions", [])
+
+                # 验证并过滤无效建议
+                valid_names = {d.name for d in definitions}
+                valid_suggestions = []
+                seen_names = set()
+                for s in suggestions_data:
+                    name = s.get("name", "").strip()
+                    target = s.get("target_name", "").strip()
+                    reason = s.get("reason", "").strip()
+                    # name必须在已有定义中，target可以在或不在（不在则直接改名）
+                    # 不能自己改自己，且每个name只出现一次
+                    if (name in valid_names and name != target
+                            and name not in seen_names and target):
+                        valid_suggestions.append(
+                            SynonymSuggestion(name=name, target_name=target, reason=reason)
+                        )
+                        seen_names.add(name)
+
+                return SynonymDetectResponse(suggestions=valid_suggestions, total_definitions=total)
+
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse JSON from DeepSeek response: {raw_response}")
+                raise HTTPException(status_code=500, detail="模型返回的数据无法解析为JSON格式")
+
+    except httpx.RequestError as e:
+        logger.error(f"Error connecting to DeepSeek: {str(e)}")
+        raise HTTPException(status_code=502, detail="连接 AI 服务失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in detect synonyms: {str(e)}")
+        raise HTTPException(status_code=500, detail="检测同义指标过程发生未知错误")
+
+
+@router.post("/apply-rename", response_model=ApplyRenameResponse)
+async def apply_rename(request: ApplyRenameRequest, db: Session = Depends(get_db)):
+    """
+    应用指标改名/合并：将用户确认的指标改名或合并到目标指标。
+    - 如果目标指标名称已存在：将源指标的所有记录迁移到目标指标，然后删除源指标
+    - 如果目标指标名称不存在：直接将源指标改名为目标名称
+    """
+    results = []
+
+    for item in request.renames:
+        name = item.name.strip()
+        target_name = item.target_name.strip()
+
+        if not name or not target_name:
+            results.append(ApplyRenameResult(
+                name=name, target_name=target_name,
+                success=False, action="error",
+                error="指标名称不能为空"
+            ))
+            continue
+
+        if name == target_name:
+            results.append(ApplyRenameResult(
+                name=name, target_name=target_name,
+                success=True, action="skipped",
+                error=None
+            ))
+            continue
+
+        try:
+            result = crud_metric.merge_definition(db, name, target_name)
+            results.append(ApplyRenameResult(
+                name=name, target_name=target_name,
+                success=result["success"],
+                action=result["action"],
+                error=result.get("error")
+            ))
+        except Exception as e:
+            logger.error(f"Error merging '{name}' -> '{target_name}': {str(e)}")
+            results.append(ApplyRenameResult(
+                name=name, target_name=target_name,
+                success=False, action="error",
+                error=str(e)
+            ))
+
+    return ApplyRenameResponse(results=results)
+
 
 @router.post("/advice")
 async def generate_health_advice(request: HealthAdviceRequest, db: Session = Depends(get_db)):

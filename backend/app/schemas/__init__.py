@@ -13,5 +13,11 @@ from .metric import (
     MetricRecordResponse,
     BatchMetricCreate,
     SmartParseRequest,
-    HealthAdviceRequest
+    HealthAdviceRequest,
+    SynonymSuggestion,
+    SynonymDetectResponse,
+    ApplyRenameItem,
+    ApplyRenameRequest,
+    ApplyRenameResult,
+    ApplyRenameResponse,
 )

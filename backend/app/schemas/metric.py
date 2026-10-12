@@ -103,3 +103,29 @@ class SmartParseRequest(BaseModel):
 
 class HealthAdviceRequest(BaseModel):
     person_id: int = Field(..., description="需要生成健康建议的人员ID")
+
+class SynonymSuggestion(BaseModel):
+    name: str = Field(..., description="当前指标名称（将被改名的指标）")
+    target_name: str = Field(..., description="建议改为的标准指标名称")
+    reason: str = Field(..., description="建议理由，说明为什么它们是同义词")
+
+class SynonymDetectResponse(BaseModel):
+    suggestions: List[SynonymSuggestion] = Field(default_factory=list, description="检测到的同义指标建议列表")
+    total_definitions: int = Field(0, description="指标定义总数")
+
+class ApplyRenameItem(BaseModel):
+    name: str = Field(..., description="当前指标名称（需要被改名）")
+    target_name: str = Field(..., description="目标指标名称")
+
+class ApplyRenameRequest(BaseModel):
+    renames: List[ApplyRenameItem] = Field(..., description="需要执行的改名列表")
+
+class ApplyRenameResult(BaseModel):
+    name: str = Field(..., description="原指标名称")
+    target_name: str = Field(..., description="目标指标名称")
+    success: bool = Field(..., description="是否成功")
+    action: str = Field(..., description="操作类型：renamed(直接改名) / merged(合并到已有指标)")
+    error: Optional[str] = Field(None, description="错误信息")
+
+class ApplyRenameResponse(BaseModel):
+    results: List[ApplyRenameResult] = Field(..., description="每条改名的执行结果")
